@@ -12,8 +12,33 @@
 
 2. Build the project:
    ```bash
+   # Using Task (recommended)
+   task build
+
+   # Or using Go directly
    go build
    ```
+
+3. Run tests:
+   ```bash
+   # Using Task (recommended)
+   task test
+
+   # Or using Go directly
+   go test -v ./...
+   ```
+
+## Development
+
+This project uses [Task](https://taskfile.dev/) for build automation. Common tasks:
+
+- `task test` - Run all tests
+- `task test-coverage` - Run tests with coverage report
+- `task bench` - Run benchmark tests
+- `task build` - Build the application
+- `task ci` - Run CI pipeline
+- `task clean` - Clean build artifacts
+- `task --list` - Show all available tasks
 
 ## Usage
 

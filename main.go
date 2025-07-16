@@ -333,6 +333,10 @@ func writeFileWithLock(filePath string, data []byte, perm os.FileMode) error {
 // Helper functions for key validation and secret management
 
 func validateKeyPath(keyPath string) error {
+	if keyPath == "" {
+		return fmt.Errorf("key path cannot be empty")
+	}
+
 	if !strings.HasPrefix(keyPath, "/") {
 		return fmt.Errorf("key path must start with '/'")
 	}
@@ -349,8 +353,8 @@ func validateKeyPath(keyPath string) error {
 		return fmt.Errorf("key path cannot contain newlines")
 	}
 
-	if strings.TrimSpace(keyPath) == "" {
-		return fmt.Errorf("key path cannot be empty")
+	if strings.Contains(keyPath, "\t") {
+		return fmt.Errorf("key path cannot contain tabs")
 	}
 
 	return nil
@@ -501,6 +505,26 @@ func decryptData(encryptedData []byte, identity age.Identity) (string, error) {
 	}
 
 	return string(decryptedData), nil
+}
+
+// parseSecrets parses the decrypted secrets content into a map
+func parseSecrets(content string) map[string]string {
+	secrets := make(map[string]string)
+	lines := strings.Split(content, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			secrets[parts[0]] = parts[1]
+		}
+	}
+
+	return secrets
 }
 
 // Placeholder functions for other commands
