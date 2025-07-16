@@ -267,11 +267,71 @@ $ ./crum delete "/test/key with spaces"
 Error: key path cannot contain spaces
 ```
 
+### Export Command
+
+The `export` command exports secrets as shell-compatible environment variable assignments based on the `.crum.yaml` config file in the current directory.
+
+```bash
+./crum export [--shell=bash|fish]
+```
+
+This command:
+- Reads the `.crum.yaml` configuration file from the current directory
+- Validates the YAML structure and paths
+- Decrypts the secrets file using the private key
+- Processes the `path_sync` section to export secrets matching a path prefix
+- Processes the `env` section to export individual secrets
+- Applies remapping from the `remap` section
+- Outputs in Bash (`export VAR=value`) or Fish (`set -x VAR value`) format
+- Includes comments for clarity
+
+#### Example Usage
+
+First, create a `.crum.yaml` configuration file:
+
+```yaml
+version: 1
+path_sync:
+  path: "/prod/billing-svc"
+  remap:
+    VARS_MG: "MG_KEY"
+    VARS_STRIPE: "STRIPE_KEY"
+
+env:
+  DATABASE_URL:
+    path: "/prod/billing-svc/db/url"
+  API_SECRET:
+    path: "/prod/billing-svc/api/secret"
+```
+
+Then export the secrets:
+
+```bash
+# Export for bash (default)
+$ ./crum export
+# Exported from /prod/billing-svc
+export API_SECRET=secret123
+export DATABASE_URL=postgres://user:pass@localhost/db
+export MG_KEY=mgsecret
+export STRIPE_KEY=stripesecret
+
+# Export for fish shell
+$ ./crum export --shell=fish
+# Exported from /prod/billing-svc
+set -x API_SECRET secret123
+set -x DATABASE_URL postgres://user:pass@localhost/db
+set -x MG_KEY mgsecret
+set -x STRIPE_KEY stripesecret
+
+# Source the output directly
+$ source <(./crum export)
+$ echo $MG_KEY
+mgsecret
+```
+
 ### Other Commands
 
-The following commands are available but not yet implemented:
-
-- `crum export [path]` - Export secrets as shell-compatible environment variables
+All major commands are now implemented. See the command documentation above for full usage details.
 
 ## Security Features
 

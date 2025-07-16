@@ -684,7 +684,96 @@ func deleteCommand(c *cli.Context) error {
 }
 
 func exportCommand(c *cli.Context) error {
-	fmt.Println("Export command not implemented yet")
+	// Get shell format (default to bash)
+	shell := c.String("shell")
+	if shell == "" {
+		shell = "bash"
+	}
+
+	// Load .crum.yaml configuration
+	crumConfig, err := loadCrumConfig()
+	if err != nil {
+		return err
+	}
+
+	// Load application configuration
+	config, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	// Load and decrypt secrets
+	secrets, err := loadSecrets(config.PrivateKeyPath)
+	if err != nil {
+		return err
+	}
+
+	// Collect environment variables to export
+	envVars := make(map[string]string)
+
+	// Process path_sync section
+	if crumConfig.PathSync.Path != "" {
+		// Add comment for clarity
+		comment := fmt.Sprintf("# Exported from %s", crumConfig.PathSync.Path)
+		if shell == "bash" {
+			fmt.Println(comment)
+		} else if shell == "fish" {
+			fmt.Println(comment)
+		}
+
+		// Find all secrets that match the path prefix
+		pathPrefix := strings.TrimSuffix(crumConfig.PathSync.Path, "/")
+		for secretPath, secretValue := range secrets {
+			if strings.HasPrefix(secretPath, pathPrefix) {
+				// Extract the key name from the path
+				keyName := strings.TrimPrefix(secretPath, pathPrefix)
+				keyName = strings.TrimPrefix(keyName, "/")
+				keyName = strings.ToUpper(strings.ReplaceAll(keyName, "/", "_"))
+
+				if keyName != "" {
+					envVars[keyName] = secretValue
+				}
+			}
+		}
+	}
+
+	// Process env section
+	for envVarName, envConfig := range crumConfig.Env {
+		if secretValue, exists := secrets[envConfig.Path]; exists {
+			envVars[envVarName] = secretValue
+		}
+	}
+
+	// Apply remap mappings
+	for originalKey, newKey := range crumConfig.PathSync.Remap {
+		if value, exists := envVars[originalKey]; exists {
+			envVars[newKey] = value
+			delete(envVars, originalKey)
+		}
+	}
+
+	// Generate shell output
+	if len(envVars) == 0 {
+		return fmt.Errorf("no secrets found to export")
+	}
+
+	// Sort keys for consistent output
+	var keys []string
+	for key := range envVars {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	// Output environment variables
+	for _, key := range keys {
+		value := envVars[key]
+		if shell == "bash" {
+			fmt.Printf("export %s=%s\n", key, value)
+		} else if shell == "fish" {
+			fmt.Printf("set -x %s %s\n", key, value)
+		}
+	}
+
 	return nil
 }
 
@@ -771,4 +860,40 @@ func matchesPathFilter(key, pathFilter string) bool {
 	// This provides partial matching as specified in the PRD
 	// e.g., "/any" matches "/any/path/mykey"
 	return strings.HasPrefix(key, pathFilter)
+}
+
+func loadCrumConfig() (*CrumConfig, error) {
+	configFileName := ".crum.yaml"
+
+	// Check if config file exists
+	if _, err := os.Stat(configFileName); os.IsNotExist(err) {
+		return nil, fmt.Errorf("no .crum.yaml found in current directory")
+	}
+
+	// Read the config file
+	data, err := os.ReadFile(configFileName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read .crum.yaml: %v", err)
+	}
+
+	// Parse YAML
+	var config CrumConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse .crum.yaml: %v", err)
+	}
+
+	// Validate version
+	if config.Version == "" {
+		return nil, fmt.Errorf("invalid .crum.yaml: missing version")
+	}
+
+	// Initialize maps if they're nil
+	if config.Env == nil {
+		config.Env = make(map[string]EnvConfig)
+	}
+	if config.PathSync.Remap == nil {
+		config.PathSync.Remap = make(map[string]string)
+	}
+
+	return &config, nil
 }
