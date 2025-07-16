@@ -63,6 +63,18 @@ func main() {
 				ArgsUsage: "<key-path> <value>",
 			},
 			{
+				Name:      "get",
+				Usage:     "Retrieve a secret by its key path",
+				Action:    getCommand,
+				ArgsUsage: "<key-path>",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:  "show",
+						Usage: "Display the actual secret value instead of masking it",
+					},
+				},
+			},
+			{
 				Name:   "init",
 				Usage:  "Create a YAML configuration file in current directory",
 				Action: initCommand,
@@ -589,6 +601,49 @@ func deleteCommand(c *cli.Context) error {
 
 func exportCommand(c *cli.Context) error {
 	fmt.Println("Export command not implemented yet")
+	return nil
+}
+
+func getCommand(c *cli.Context) error {
+	// Check arguments
+	if c.Args().Len() != 1 {
+		return fmt.Errorf("usage: crum get <key-path>")
+	}
+
+	keyPath := c.Args().Get(0)
+	showValue := c.Bool("show")
+
+	// Validate key path
+	if err := validateKeyPath(keyPath); err != nil {
+		return err
+	}
+
+	// Load configuration
+	config, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	// Load and decrypt secrets
+	secrets, err := loadSecrets(config.PrivateKeyPath)
+	if err != nil {
+		return err
+	}
+
+	// Check if key exists
+	value, exists := secrets[keyPath]
+	if !exists {
+		fmt.Println("Key not found.")
+		return nil
+	}
+
+	// Display the key and value
+	if showValue {
+		fmt.Printf("%s=%s\n", keyPath, value)
+	} else {
+		fmt.Printf("%s=****\n", keyPath)
+	}
+
 	return nil
 }
 

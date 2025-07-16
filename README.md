@@ -139,6 +139,44 @@ $ ./crum set "/test/key with spaces" value
 Error: key path cannot contain spaces
 ```
 
+### Get Command
+
+The `get` command retrieves a secret by its key path.
+
+```bash
+./crum get <key-path> [--show]
+```
+
+This command:
+- Validates the key path (must start with `/`, no spaces or special characters)
+- Decrypts the secrets file using the private key
+- By default, displays the key path and masks the value with `****`
+- Supports `--show` flag to display the actual secret value
+- Requires a full key path (partial paths are not supported)
+
+#### Example Usage
+
+```bash
+# Get a secret (masked value)
+$ ./crum get /prod/api_key
+/prod/api_key=****
+
+# Get a secret with actual value
+$ ./crum get --show /prod/api_key
+/prod/api_key=secret123
+
+# Key not found
+$ ./crum get /nonexistent/key
+Key not found.
+
+# Invalid key path
+$ ./crum get invalid_key
+Error: key path must start with '/'
+
+$ ./crum get "/test/key with spaces"
+Error: key path cannot contain spaces
+```
+
 ### Other Commands
 
 The following commands are available but not yet implemented:
@@ -186,6 +224,7 @@ The tool provides clear error messages for common issues:
 - ✅ Setup command - Complete
 - ✅ List command - Complete
 - ✅ Set command - Complete
+- ✅ Get command - Complete
 - ⏳ Init command - Not implemented
 - ⏳ Delete command - Not implemented
 - ⏳ Export command - Not implemented
