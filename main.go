@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"syscall"
 
@@ -55,9 +56,10 @@ func main() {
 				Action: listCommand,
 			},
 			{
-				Name:   "set",
-				Usage:  "Add or update a secret key-value pair",
-				Action: setCommand,
+				Name:      "set",
+				Usage:     "Add or update a secret key-value pair",
+				Action:    setCommand,
+				ArgsUsage: "<key-path> <value>",
 			},
 			{
 				Name:   "init",
@@ -102,14 +104,14 @@ func setupCommand(c *cli.Context) error {
 
 	// Check if files already exist and prompt for confirmation
 	if _, err := os.Stat(configPath); err == nil {
-		if !confirmOverwrite(configPath) {
+		if !confirmOverwrite(fmt.Sprintf("Config file %s", configPath)) {
 			fmt.Println("Setup cancelled.")
 			return nil
 		}
 	}
 
 	if _, err := os.Stat(secretsPath); err == nil {
-		if !confirmOverwrite(secretsPath) {
+		if !confirmOverwrite(fmt.Sprintf("Secrets file %s", secretsPath)) {
 			fmt.Println("Setup cancelled.")
 			return nil
 		}
@@ -179,8 +181,8 @@ func expandTilde(path string) string {
 	return path
 }
 
-func confirmOverwrite(filePath string) bool {
-	fmt.Printf("File %s already exists. Overwrite? (y/n): ", filePath)
+func confirmOverwrite(item string) bool {
+	fmt.Printf("%s already exists. Overwrite? (y/n): ", item)
 
 	// Use terminal to read a single character
 	oldState, err := term.MakeRaw(int(syscall.Stdin))
@@ -308,6 +310,179 @@ func writeFileWithLock(filePath string, data []byte, perm os.FileMode) error {
 	return nil
 }
 
+// Helper functions for key validation and secret management
+
+func validateKeyPath(keyPath string) error {
+	if !strings.HasPrefix(keyPath, "/") {
+		return fmt.Errorf("key path must start with '/'")
+	}
+
+	if strings.Contains(keyPath, " ") {
+		return fmt.Errorf("key path cannot contain spaces")
+	}
+
+	if strings.Contains(keyPath, "=") {
+		return fmt.Errorf("key path cannot contain '=' character")
+	}
+
+	if strings.Contains(keyPath, "\n") {
+		return fmt.Errorf("key path cannot contain newlines")
+	}
+
+	if strings.TrimSpace(keyPath) == "" {
+		return fmt.Errorf("key path cannot be empty")
+	}
+
+	return nil
+}
+
+func loadConfig() (*Config, error) {
+	configPath := filepath.Join(os.Getenv("HOME"), ".config", "crum", "config.yaml")
+
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("configuration not found. Run 'crum setup' first")
+	}
+
+	configData, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	var config Config
+	if err := yaml.Unmarshal(configData, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse config file: %w", err)
+	}
+
+	return &config, nil
+}
+
+func loadSecrets(privateKeyPath string) (map[string]string, error) {
+	secretsPath := filepath.Join(os.Getenv("HOME"), ".config", "crum", "secrets")
+
+	if _, err := os.Stat(secretsPath); os.IsNotExist(err) {
+		return make(map[string]string), nil
+	}
+
+	// Read private key
+	privateKeyData, err := os.ReadFile(privateKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read private key: %w", err)
+	}
+
+	// Parse private key identity
+	identity, err := agessh.ParseIdentity(privateKeyData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
+	}
+
+	// Read and decrypt secrets file
+	encryptedData, err := readFileWithLock(secretsPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read secrets file: %w", err)
+	}
+
+	if len(encryptedData) == 0 {
+		return make(map[string]string), nil
+	}
+
+	decryptedData, err := decryptData(encryptedData, identity)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt secrets: %w", err)
+	}
+
+	// Parse key-value pairs
+	secrets := make(map[string]string)
+	lines := strings.Split(strings.TrimSpace(decryptedData), "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		secrets[key] = value
+	}
+
+	return secrets, nil
+}
+
+func saveSecrets(secrets map[string]string, publicKeyPath string) error {
+	secretsPath := filepath.Join(os.Getenv("HOME"), ".config", "crum", "secrets")
+
+	// Read public key
+	publicKeyData, err := os.ReadFile(publicKeyPath)
+	if err != nil {
+		return fmt.Errorf("failed to read public key: %w", err)
+	}
+
+	// Parse public key as recipient
+	recipient, err := agessh.ParseRecipient(strings.TrimSpace(string(publicKeyData)))
+	if err != nil {
+		return fmt.Errorf("failed to parse public key: %w", err)
+	}
+
+	// Convert secrets map to string format
+	var lines []string
+	for key, value := range secrets {
+		lines = append(lines, fmt.Sprintf("%s=%s", key, value))
+	}
+
+	// Sort lines for consistent output
+	sort.Strings(lines)
+	content := strings.Join(lines, "\n")
+
+	// Encrypt the content
+	encryptedData, err := encryptData(content, []age.Recipient{recipient})
+	if err != nil {
+		return fmt.Errorf("failed to encrypt secrets: %w", err)
+	}
+
+	// Write encrypted file with locking
+	return writeFileWithLock(secretsPath, encryptedData, 0600)
+}
+
+func readFileWithLock(filePath string) ([]byte, error) {
+	file, err := os.OpenFile(filePath, os.O_RDONLY, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	// Apply file lock
+	if err := unix.Flock(int(file.Fd()), unix.LOCK_SH); err != nil {
+		return nil, fmt.Errorf("failed to lock file: %w", err)
+	}
+	defer unix.Flock(int(file.Fd()), unix.LOCK_UN)
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	return data, nil
+}
+
+func decryptData(encryptedData []byte, identity age.Identity) (string, error) {
+	r, err := age.Decrypt(strings.NewReader(string(encryptedData)), identity)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt data: %w", err)
+	}
+
+	decryptedData, err := io.ReadAll(r)
+	if err != nil {
+		return "", fmt.Errorf("failed to read decrypted data: %w", err)
+	}
+
+	return string(decryptedData), nil
+}
+
 // Placeholder functions for other commands
 func listCommand(c *cli.Context) error {
 	fmt.Println("List command not implemented yet")
@@ -315,7 +490,49 @@ func listCommand(c *cli.Context) error {
 }
 
 func setCommand(c *cli.Context) error {
-	fmt.Println("Set command not implemented yet")
+	// Check arguments
+	if c.Args().Len() != 2 {
+		return fmt.Errorf("usage: crum set <key-path> <value>")
+	}
+
+	keyPath := c.Args().Get(0)
+	value := c.Args().Get(1)
+
+	// Validate key path
+	if err := validateKeyPath(keyPath); err != nil {
+		return err
+	}
+
+	// Load configuration
+	config, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	// Load and decrypt secrets
+	secrets, err := loadSecrets(config.PrivateKeyPath)
+	if err != nil {
+		return err
+	}
+
+	// Check if key exists and prompt for overwrite
+	if existingValue, exists := secrets[keyPath]; exists {
+		fmt.Printf("Key '%s' already exists with value: %s\n", keyPath, existingValue)
+		if !confirmOverwrite("key") {
+			fmt.Println("Operation cancelled.")
+			return nil
+		}
+	}
+
+	// Update the key-value pair
+	secrets[keyPath] = value
+
+	// Save encrypted secrets
+	if err := saveSecrets(secrets, config.PublicKeyPath); err != nil {
+		return err
+	}
+
+	fmt.Printf("Successfully set key: %s\n", keyPath)
 	return nil
 }
 

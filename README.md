@@ -1,6 +1,49 @@
 # Crum - Secure API Key Management Tool
 
-`crum` is a command line tool designed to securely store, manage, and export API keys and secrets for developers. It uses an encrypted plain text file as the backend, leveraging the `age` encryption library with SSH public/private key pairs for encryption and decryption.
+`crum` is a comman### Set Command
+
+The `set` command adds or updates a secret key-value pair.
+
+```bash
+./crum set <key-path> <value>
+```
+
+This command:
+- Validates the key path (must start with `/`, no spaces or special characters)
+- Decrypts the secrets file using the private key
+- Checks if the key already exists and prompts for confirmation if it does
+- Adds or updates the key-value pair
+- Re-encrypts and saves the secrets file
+
+#### Example Usage
+
+```bash
+# Add a new secret
+$ ./crum set /prod/api_key secret123
+Successfully set key: /prod/api_key
+
+# Update an existing secret (with confirmation)
+$ ./crum set /prod/api_key newsecret456
+Key '/prod/api_key' already exists with value: secret123
+key already exists. Overwrite? (y/n): y
+Successfully set key: /prod/api_key
+
+# Invalid key path examples
+$ ./crum set invalid_key value
+Error: key path must start with '/'
+
+$ ./crum set "/test/key with spaces" value
+Error: key path cannot contain spaces
+```
+
+### Other Commands
+
+The following commands are available but not yet implemented:
+
+- `crum ls [path]` - List stored secret keys
+- `crum init` - Create a YAML configuration file in current directory
+- `crum delete <key-path>` - Delete a secret key-value pair
+- `crum export [path]` - Export secrets as shell-compatible environment variablesol designed to securely store, manage, and export API keys and secrets for developers. It uses an encrypted plain text file as the backend, leveraging the `age` encryption library with SSH public/private key pairs for encryption and decryption.
 
 ## Installation
 
@@ -105,7 +148,7 @@ The tool provides clear error messages for common issues:
 
 - ✅ Setup command - Complete
 - ⏳ List command - Not implemented
-- ⏳ Set command - Not implemented
+- ✅ Set command - Complete
 - ⏳ Init command - Not implemented
 - ⏳ Delete command - Not implemented
 - ⏳ Export command - Not implemented
