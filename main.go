@@ -80,9 +80,10 @@ func main() {
 				Action: initCommand,
 			},
 			{
-				Name:   "delete",
-				Usage:  "Delete a secret key-value pair",
-				Action: deleteCommand,
+				Name:      "delete",
+				Usage:     "Delete a secret key-value pair",
+				Action:    deleteCommand,
+				ArgsUsage: "<key-path>",
 			},
 			{
 				Name:  "export",
@@ -626,7 +627,59 @@ func initCommand(c *cli.Context) error {
 }
 
 func deleteCommand(c *cli.Context) error {
-	fmt.Println("Delete command not implemented yet")
+	// Check arguments
+	if c.Args().Len() != 1 {
+		return fmt.Errorf("usage: crum delete <key-path>")
+	}
+
+	keyPath := c.Args().Get(0)
+
+	// Validate key path
+	if err := validateKeyPath(keyPath); err != nil {
+		return err
+	}
+
+	// Load configuration
+	config, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	// Load and decrypt secrets
+	secrets, err := loadSecrets(config.PrivateKeyPath)
+	if err != nil {
+		return err
+	}
+
+	// Check if key exists
+	if _, exists := secrets[keyPath]; !exists {
+		fmt.Println("Key not found.")
+		return nil
+	}
+
+	// Prompt user to confirm by typing exact key path
+	fmt.Printf("Type the key path to confirm deletion: ")
+	reader := bufio.NewReader(os.Stdin)
+	confirmation, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("failed to read confirmation: %w", err)
+	}
+
+	confirmation = strings.TrimSpace(confirmation)
+	if confirmation != keyPath {
+		fmt.Println("Confirmation failed. Deletion cancelled.")
+		return nil
+	}
+
+	// Remove the key-value pair
+	delete(secrets, keyPath)
+
+	// Save encrypted secrets
+	if err := saveSecrets(secrets, config.PublicKeyPath); err != nil {
+		return err
+	}
+
+	fmt.Printf("Successfully deleted key: %s\n", keyPath)
 	return nil
 }
 

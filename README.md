@@ -226,11 +226,51 @@ This structure allows you to configure:
 - `path_sync.remap`: Key remapping for environment variables
 - `env`: Individual environment variable configurations
 
+### Delete Command
+
+The `delete` command deletes a secret key-value pair from the encrypted file.
+
+```bash
+./crum delete <key-path>
+```
+
+This command:
+- Validates the key path (must start with `/`, no spaces or special characters)
+- Decrypts the secrets file using the private key
+- Prompts the user to confirm deletion by typing the exact key path
+- Removes the key-value pair if it exists
+- Re-encrypts and saves the secrets file
+- Fails gracefully if the key does not exist
+
+#### Example Usage
+
+```bash
+# Delete a secret (with confirmation)
+$ ./crum delete /prod/billing-svc/vars/mg
+Type the key path to confirm deletion: /prod/billing-svc/vars/mg
+Successfully deleted key: /prod/billing-svc/vars/mg
+
+# Wrong confirmation (deletion cancelled)
+$ ./crum delete /prod/api_key
+Type the key path to confirm deletion: /wrong/path
+Confirmation failed. Deletion cancelled.
+
+# Key not found
+$ ./crum delete /nonexistent/key
+Key not found.
+
+# Invalid key path
+$ ./crum delete invalid_key
+Error: key path must start with '/'
+
+$ ./crum delete "/test/key with spaces"
+Error: key path cannot contain spaces
+```
+
 ### Other Commands
 
 The following commands are available but not yet implemented:
 
-- `crum delete <key-path>` - Delete a secret key-value pair
 - `crum export [path]` - Export secrets as shell-compatible environment variables
 
 ## Security Features
@@ -274,5 +314,5 @@ The tool provides clear error messages for common issues:
 - ✅ Set command - Complete
 - ✅ Get command - Complete
 - ✅ Init command - Complete
-- ⏳ Delete command - Not implemented
+- ✅ Delete command - Complete
 - ⏳ Export command - Not implemented
