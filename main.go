@@ -94,6 +94,12 @@ func main() {
 						Usage: "Shell format (bash or fish)",
 						Value: "bash",
 					},
+					&cli.StringFlag{
+						Name:    "file",
+						Aliases: []string{"f"},
+						Usage:   "Configuration file to use (default: .crum.yaml)",
+						Value:   ".crum.yaml",
+					},
 				},
 				Action: exportCommand,
 			},
@@ -690,8 +696,11 @@ func exportCommand(c *cli.Context) error {
 		shell = "bash"
 	}
 
+	// Get config file path from flag
+	configFile := c.String("file")
+
 	// Load .crum.yaml configuration
-	crumConfig, err := loadCrumConfig()
+	crumConfig, err := loadCrumConfig(configFile)
 	if err != nil {
 		return err
 	}
@@ -862,29 +871,27 @@ func matchesPathFilter(key, pathFilter string) bool {
 	return strings.HasPrefix(key, pathFilter)
 }
 
-func loadCrumConfig() (*CrumConfig, error) {
-	configFileName := ".crum.yaml"
-
+func loadCrumConfig(configFileName string) (*CrumConfig, error) {
 	// Check if config file exists
 	if _, err := os.Stat(configFileName); os.IsNotExist(err) {
-		return nil, fmt.Errorf("no .crum.yaml found in current directory")
+		return nil, fmt.Errorf("no %s found", configFileName)
 	}
 
 	// Read the config file
 	data, err := os.ReadFile(configFileName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read .crum.yaml: %v", err)
+		return nil, fmt.Errorf("failed to read %s: %v", configFileName, err)
 	}
 
 	// Parse YAML
 	var config CrumConfig
 	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("failed to parse .crum.yaml: %v", err)
+		return nil, fmt.Errorf("failed to parse %s: %v", configFileName, err)
 	}
 
 	// Validate version
 	if config.Version == "" {
-		return nil, fmt.Errorf("invalid .crum.yaml: missing version")
+		return nil, fmt.Errorf("invalid %s: missing version", configFileName)
 	}
 
 	// Initialize maps if they're nil

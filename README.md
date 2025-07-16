@@ -269,14 +269,14 @@ Error: key path cannot contain spaces
 
 ### Export Command
 
-The `export` command exports secrets as shell-compatible environment variable assignments based on the `.crum.yaml` config file in the current directory.
+The `export` command exports secrets as shell-compatible environment variable assignments based on the `.crum.yaml` config file.
 
 ```bash
-./crum export [--shell=bash|fish]
+./crum export [--shell=bash|fish] [-f config-file]
 ```
 
 This command:
-- Reads the `.crum.yaml` configuration file from the current directory
+- Reads the `.crum.yaml` configuration file from the current directory (or a custom path with `-f`)
 - Validates the YAML structure and paths
 - Decrypts the secrets file using the private key
 - Processes the `path_sync` section to export secrets matching a path prefix
@@ -322,6 +322,16 @@ set -x API_SECRET secret123
 set -x DATABASE_URL postgres://user:pass@localhost/db
 set -x MG_KEY mgsecret
 set -x STRIPE_KEY stripesecret
+
+# Use a custom config file
+$ ./crum export -f my-project.yaml
+# Exported from /prod/my-project
+export MY_SECRET=value123
+
+# Use custom config file with long flag
+$ ./crum export --file my-project.yaml --shell=fish
+# Exported from /prod/my-project
+set -x MY_SECRET value123
 
 # Source the output directly
 $ source <(./crum export)
