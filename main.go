@@ -590,7 +590,38 @@ func setCommand(c *cli.Context) error {
 }
 
 func initCommand(c *cli.Context) error {
-	fmt.Println("Init command not implemented yet")
+	configFileName := ".crum.yaml"
+
+	// Check if .crum.yaml already exists
+	if _, err := os.Stat(configFileName); err == nil {
+		if !confirmOverwrite(fmt.Sprintf("Config file %s", configFileName)) {
+			fmt.Println("Operation cancelled.")
+			return nil
+		}
+	}
+
+	// Create default config structure
+	defaultConfig := CrumConfig{
+		Version: "1.0",
+		PathSync: PathSync{
+			Path:  "",
+			Remap: make(map[string]string),
+		},
+		Env: make(map[string]EnvConfig),
+	}
+
+	// Marshal to YAML
+	yamlData, err := yaml.Marshal(defaultConfig)
+	if err != nil {
+		return fmt.Errorf("failed to marshal default config: %w", err)
+	}
+
+	// Write to file
+	if err := os.WriteFile(configFileName, yamlData, 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	fmt.Printf("Successfully created %s\n", configFileName)
 	return nil
 }
 

@@ -177,11 +177,59 @@ $ ./crum get "/test/key with spaces"
 Error: key path cannot contain spaces
 ```
 
+### Init Command
+
+The `init` command creates a YAML configuration file in the current directory.
+
+```bash
+./crum init
+```
+
+This command:
+- Creates a `.crum.yaml` file in the current directory
+- Uses a default structure with empty configuration
+- Prompts for confirmation if the file already exists
+- Validates the YAML structure before writing
+
+#### Example Usage
+
+```bash
+# Create a new .crum.yaml file
+$ ./crum init
+Successfully created .crum.yaml
+
+# File already exists (with confirmation)
+$ ./crum init
+Config file .crum.yaml already exists. Overwrite? (y/n): y
+Successfully created .crum.yaml
+
+# Reject overwrite
+$ ./crum init
+Config file .crum.yaml already exists. Overwrite? (y/n): n
+Operation cancelled.
+```
+
+#### Default Configuration Structure
+
+The created `.crum.yaml` file contains:
+
+```yaml
+version: "1.0"
+path_sync:
+    path: ""
+    remap: {}
+env: {}
+```
+
+This structure allows you to configure:
+- `path_sync.path`: A path to sync secrets from (e.g., `/prod/billing-svc`)
+- `path_sync.remap`: Key remapping for environment variables
+- `env`: Individual environment variable configurations
+
 ### Other Commands
 
 The following commands are available but not yet implemented:
 
-- `crum init` - Create a YAML configuration file in current directory
 - `crum delete <key-path>` - Delete a secret key-value pair
 - `crum export [path]` - Export secrets as shell-compatible environment variables
 
@@ -225,6 +273,6 @@ The tool provides clear error messages for common issues:
 - ✅ List command - Complete
 - ✅ Set command - Complete
 - ✅ Get command - Complete
-- ⏳ Init command - Not implemented
+- ✅ Init command - Complete
 - ⏳ Delete command - Not implemented
 - ⏳ Export command - Not implemented
