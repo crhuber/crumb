@@ -51,9 +51,10 @@ func main() {
 				Action: setupCommand,
 			},
 			{
-				Name:   "ls",
-				Usage:  "List stored secret keys",
-				Action: listCommand,
+				Name:      "ls",
+				Usage:     "List stored secret keys",
+				Action:    listCommand,
+				ArgsUsage: "[path]",
 			},
 			{
 				Name:      "set",
@@ -485,7 +486,47 @@ func decryptData(encryptedData []byte, identity age.Identity) (string, error) {
 
 // Placeholder functions for other commands
 func listCommand(c *cli.Context) error {
-	fmt.Println("List command not implemented yet")
+	// Get optional path filter argument
+	pathFilter := ""
+	if c.Args().Len() > 0 {
+		pathFilter = c.Args().Get(0)
+	}
+
+	// Load configuration
+	config, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	// Load and decrypt secrets
+	secrets, err := loadSecrets(config.PrivateKeyPath)
+	if err != nil {
+		return err
+	}
+
+	// Check if secrets is empty
+	if len(secrets) == 0 {
+		fmt.Println("No secrets found")
+		return nil
+	}
+
+	// Get filtered and sorted keys
+	keys := getFilteredKeys(secrets, pathFilter)
+
+	// Display keys
+	if len(keys) == 0 {
+		if pathFilter != "" {
+			fmt.Printf("No secrets found matching path: %s\n", pathFilter)
+		} else {
+			fmt.Println("No secrets found")
+		}
+		return nil
+	}
+
+	for _, key := range keys {
+		fmt.Println(key)
+	}
+
 	return nil
 }
 
@@ -549,4 +590,46 @@ func deleteCommand(c *cli.Context) error {
 func exportCommand(c *cli.Context) error {
 	fmt.Println("Export command not implemented yet")
 	return nil
+}
+
+func getFilteredKeys(secrets map[string]string, pathFilter string) []string {
+	var keys []string
+
+	// Normalize path filter (remove trailing slash if present)
+	if pathFilter != "" && pathFilter != "/" {
+		pathFilter = strings.TrimSuffix(pathFilter, "/")
+	}
+
+	// Extract keys from secrets map
+	for key := range secrets {
+		keys = append(keys, key)
+	}
+
+	// Filter keys if path filter is provided
+	if pathFilter != "" {
+		var filteredKeys []string
+		for _, key := range keys {
+			if matchesPathFilter(key, pathFilter) {
+				filteredKeys = append(filteredKeys, key)
+			}
+		}
+		keys = filteredKeys
+	}
+
+	// Sort keys alphabetically
+	sort.Strings(keys)
+
+	return keys
+}
+
+func matchesPathFilter(key, pathFilter string) bool {
+	// Handle root path filter
+	if pathFilter == "/" {
+		return true
+	}
+
+	// Check if key starts with the path filter
+	// This provides partial matching as specified in the PRD
+	// e.g., "/any" matches "/any/path/mykey"
+	return strings.HasPrefix(key, pathFilter)
 }
