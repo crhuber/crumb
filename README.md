@@ -218,6 +218,29 @@ This structure allows you to configure:
 - `path_sync.remap`: Key remapping for environment variables
 - `env`: Individual environment variable configurations
 
+#### Remapping Keys
+
+You can change what finally gets exported to shell by using `path_sync.remap` using the following format:
+
+```
+  remap: {
+        "FROM": "TO"
+    }
+```
+
+
+ie:
+```
+    remap: {
+        "SOME-SECRET-KEY": "MY-KEY"
+    }
+```
+will result in SOME-SECRET-KEY being exported as MY-KEY
+
+```
+export MY-KEY=******
+```
+
 ### Delete Command
 
 The `delete` command deletes a secret key-value pair from the encrypted file.
