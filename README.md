@@ -9,7 +9,7 @@
 OR  use [kelp](https://github.com/crhuber/kelp)
 
 ```bash
-kelp add -i crhuber/crum
+kelp add -i crhuber/crumb
 ```
 ## Usage
 
