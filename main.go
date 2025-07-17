@@ -123,7 +123,7 @@ func main() {
 	}
 }
 
-func setupCommand(c *cli.Context) error {
+func setupCommand(_ *cli.Context) error {
 	// Create ~/.config/crum directory if it doesn't exist
 	configDir := filepath.Join(os.Getenv("HOME"), ".config", "crum")
 	if err := os.MkdirAll(configDir, 0700); err != nil {
@@ -631,7 +631,7 @@ func setCommand(c *cli.Context) error {
 	return nil
 }
 
-func initCommand(c *cli.Context) error {
+func initCommand(_ *cli.Context) error {
 	configFileName := ".crum.yaml"
 
 	// Check if .crum.yaml already exists
@@ -659,7 +659,7 @@ func initCommand(c *cli.Context) error {
 	}
 
 	// Write to file
-	if err := os.WriteFile(configFileName, yamlData, 0644); err != nil {
+	if err := os.WriteFile(configFileName, yamlData, 0600); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 

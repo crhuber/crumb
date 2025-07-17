@@ -25,7 +25,7 @@ func createTestSSHKeys(t *testing.T, tempDir string) (string, string) {
 	// Create mock SSH public key content
 	pubKeyContent := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGbzWC4LRQ8L4fz8Q4qP5lqzNbBcQp7qPKW1K2tLPRzA test@example.com"
 
-	err := os.WriteFile(pubKeyPath, []byte(pubKeyContent), 0644)
+	err := os.WriteFile(pubKeyPath, []byte(pubKeyContent), 0600)
 	if err != nil {
 		t.Fatalf("Failed to create test public key: %v", err)
 	}
@@ -273,7 +273,7 @@ env: {}`,
 			configPath := filepath.Join(tempDir, tt.configFile)
 
 			if tt.content != "" {
-				err := os.WriteFile(configPath, []byte(tt.content), 0644)
+				err := os.WriteFile(configPath, []byte(tt.content), 0600)
 				if err != nil {
 					t.Fatalf("Failed to write test config: %v", err)
 				}
@@ -385,7 +385,7 @@ func TestConfigInitialization(t *testing.T) {
 
 	// Test with minimal config
 	minimalConfig := `version: 1`
-	err := os.WriteFile(configPath, []byte(minimalConfig), 0644)
+	err := os.WriteFile(configPath, []byte(minimalConfig), 0600)
 	if err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
 	}

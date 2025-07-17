@@ -137,7 +137,7 @@ path_sync:
   remap: {}
 env: {}`
 
-		err := os.WriteFile(configPath, []byte(defaultConfig), 0644)
+		err := os.WriteFile(configPath, []byte(defaultConfig), 0600)
 		if err != nil {
 			t.Fatalf("Failed to write config file: %v", err)
 		}
@@ -221,7 +221,7 @@ env:
     path: "/prod/billing-svc/api/secret"`
 
 	configPath := filepath.Join(tempDir, "test.yaml")
-	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	err := os.WriteFile(configPath, []byte(configContent), 0600)
 	if err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
 	}
