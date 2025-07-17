@@ -18,6 +18,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Version information (injected by GoReleaser)
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 // Config represents the configuration stored in ~/.config/crum/config.yaml
 type Config struct {
 	PublicKeyPath  string `yaml:"public_key_path"`
@@ -41,9 +48,13 @@ type EnvConfig struct {
 }
 
 func main() {
+	cli.VersionPrinter = func(cCtx *cli.Context) {
+		fmt.Printf("version=%s commit=%s date=%s\n", cCtx.App.Version, commit, date)
+	}
 	app := &cli.App{
-		Name:  "crum",
-		Usage: "Securely store, manage, and export API keys and secrets",
+		Name:    "crum",
+		Usage:   "Securely store, manage, and export API keys and secrets",
+		Version: version,
 		Commands: []*cli.Command{
 			{
 				Name:   "setup",

@@ -2,3 +2,5 @@ prd.markdown
 todo.markdown
 crum
 .crum.yaml
+./build/
+./coverage/

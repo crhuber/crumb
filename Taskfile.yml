@@ -108,12 +108,6 @@ tasks:
       - sh: command -v gosec
         msg: "gosec is not installed. Run: go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest"
 
-  install:
-    desc: Install the binary to $GOPATH/bin
-    deps: [build]
-    cmds:
-      - go install .
-
   ci:
     desc: Run CI pipeline (lint, test, build)
     cmds:
@@ -130,23 +124,6 @@ tasks:
       - task: bench
       - task: build
 
-  demo:
-    desc: Run a demo of the application
-    deps: [build]
-    cmds:
-      - echo "Running crum demo..."
-      - 'echo "Note: This requires SSH keys to be set up"'
-      - './{{.BUILD_DIR}}/{{.BINARY_NAME}} --help'
-
-  watch:
-    desc: Watch for changes and run tests
-    cmds:
-      - echo "Watching for changes... (requires fswatch)"
-      - fswatch -o . | xargs -n1 -I{} task test-unit
-    preconditions:
-      - sh: command -v fswatch
-        msg: "fswatch is not installed. Install with: brew install fswatch (macOS) or apt-get install fswatch (Ubuntu)"
-
   setup-dev:
     desc: Setup development environment
     cmds:
@@ -156,11 +133,6 @@ tasks:
       - go install github.com/go-task/task/v3/cmd/task@latest
       - echo "Development environment setup complete!"
 
-  test-verbose:
-    desc: Run tests with verbose output (no filtering)
-    cmds:
-      - echo "Running tests with verbose output..."
-      - go test -v ./...
 
   test-race:
     desc: Run tests with race detection
@@ -168,27 +140,6 @@ tasks:
       - echo "Running tests with race detection..."
       - go test -v -race ./...
 
-  test-short:
-    desc: Run tests in short mode
-    cmds:
-      - echo "Running tests in short mode..."
-      - go test -v -short ./...
-
-  profile-cpu:
-    desc: Profile CPU usage during tests
-    cmds:
-      - echo "Profiling CPU usage during tests..."
-      - go test -v -cpuprofile=cpu.prof ./...
-      - echo "CPU profile saved to cpu.prof"
-      - 'echo "View with: go tool pprof cpu.prof"'
-
-  profile-mem:
-    desc: Profile memory usage during tests
-    cmds:
-      - echo "Profiling memory usage during tests..."
-      - go test -v -memprofile=mem.prof ./...
-      - echo "Memory profile saved to mem.prof"
-      - 'echo "View with: go tool pprof mem.prof"'
 
   release:
     desc: Build release binaries for multiple platforms
@@ -201,25 +152,3 @@ tasks:
       - GOOS=linux GOARCH=amd64 go build -o {{.BUILD_DIR}}/release/{{.BINARY_NAME}}-linux-amd64 .
       - GOOS=linux GOARCH=arm64 go build -o {{.BUILD_DIR}}/release/{{.BINARY_NAME}}-linux-arm64 .
       - echo "Release binaries built in {{.BUILD_DIR}}/release/"
-
-  help:
-    desc: Show detailed help for common tasks
-    cmds:
-      - echo "Crum CLI Tool - Task Runner Help"
-      - echo "================================"
-      - echo ""
-      - echo "Common tasks:"
-      - echo "  task test           - Run all tests"
-      - echo "  task test-coverage  - Run tests with coverage report"
-      - echo "  task bench          - Run benchmark tests"
-      - echo "  task build          - Build the application"
-      - echo "  task ci             - Run CI pipeline"
-      - echo "  task clean          - Clean build artifacts"
-      - echo ""
-      - echo "Development tasks:"
-      - echo "  task setup-dev      - Setup development environment"
-      - echo "  task watch          - Watch for changes and run tests"
-      - echo "  task lint           - Run linter and formatter"
-      - echo "  task security       - Run security scanner"
-      - echo ""
-      - 'echo "For a full list of tasks, run: task --list"'

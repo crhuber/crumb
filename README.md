@@ -4,41 +4,8 @@
 
 ## Installation
 
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd crum
-   ```
+1. Download and add binary to $PATH from https://github.com/crhuber/crum/releases
 
-2. Build the project:
-   ```bash
-   # Using Task (recommended)
-   task build
-
-   # Or using Go directly
-   go build
-   ```
-
-3. Run tests:
-   ```bash
-   # Using Task (recommended)
-   task test
-
-   # Or using Go directly
-   go test -v ./...
-   ```
-
-## Development
-
-This project uses [Task](https://taskfile.dev/) for build automation. Common tasks:
-
-- `task test` - Run all tests
-- `task test-coverage` - Run tests with coverage report
-- `task bench` - Run benchmark tests
-- `task build` - Build the application
-- `task ci` - Run CI pipeline
-- `task clean` - Clean build artifacts
-- `task --list` - Show all available tasks
 
 ## Usage
 
@@ -383,31 +350,15 @@ The tool creates two configuration files:
 1. `~/.config/crum/config.yaml` - Stores SSH key paths
 2. `~/.config/crum/secrets` - Encrypted key-value store
 
-## Dependencies
 
-- Go 1.20 or later
-- `github.com/urfave/cli/v2` - CLI framework
-- `filippo.io/age` - Encryption library
-- `gopkg.in/yaml.v3` - YAML parsing
-- `golang.org/x/term` - Terminal handling
-- `golang.org/x/sys/unix` - File locking
+## Development
 
-## Error Handling
+This project uses [Task](https://taskfile.dev/) for build automation. Common tasks:
 
-The tool provides clear error messages for common issues:
-
-- Missing or invalid SSH key files
-- Decryption failures due to mismatched keys
-- Invalid key paths or values
-- File permission issues
-- Concurrent access attempts
-
-## Development Status
-
-- ✅ Setup command - Complete
-- ✅ List command - Complete
-- ✅ Set command - Complete
-- ✅ Get command - Complete
-- ✅ Init command - Complete
-- ✅ Delete command - Complete
-- ⏳ Export command - Not implemented
+- `task test` - Run all tests
+- `task test-coverage` - Run tests with coverage report
+- `task bench` - Run benchmark tests
+- `task build` - Build the application
+- `task ci` - Run CI pipeline
+- `task clean` - Clean build artifacts
+- `task --list` - Show all available tasks
