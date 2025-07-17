@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,7 +10,7 @@ import (
 
 // Test helper functions
 func createTempDir(t *testing.T) string {
-	tempDir, err := ioutil.TempDir("", "crum_test")
+	tempDir, err := os.MkdirTemp("", "crum_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -26,7 +25,7 @@ func createTestSSHKeys(t *testing.T, tempDir string) (string, string) {
 	// Create mock SSH public key content
 	pubKeyContent := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGbzWC4LRQ8L4fz8Q4qP5lqzNbBcQp7qPKW1K2tLPRzA test@example.com"
 
-	err := ioutil.WriteFile(pubKeyPath, []byte(pubKeyContent), 0644)
+	err := os.WriteFile(pubKeyPath, []byte(pubKeyContent), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create test public key: %v", err)
 	}
@@ -42,7 +41,7 @@ o6aJmMrJMxJrMNlWqkMwkKpgPzOzMqJaZMTdGjKQCJYLEJkNMhLIkJc6vhJxvBqEzS0Z
 fDLiTUGOyT8uOJaGYOHKWZGKHdBvHCwXCJMYQfVYPJBMWKjFYhzGGqQjJjJjJpJgJU5v
 -----END OPENSSH PRIVATE KEY-----`
 
-	err = ioutil.WriteFile(privKeyPath, []byte(privKeyContent), 0600)
+	err = os.WriteFile(privKeyPath, []byte(privKeyContent), 0600)
 	if err != nil {
 		t.Fatalf("Failed to create test private key: %v", err)
 	}
@@ -274,7 +273,7 @@ env: {}`,
 			configPath := filepath.Join(tempDir, tt.configFile)
 
 			if tt.content != "" {
-				err := ioutil.WriteFile(configPath, []byte(tt.content), 0644)
+				err := os.WriteFile(configPath, []byte(tt.content), 0644)
 				if err != nil {
 					t.Fatalf("Failed to write test config: %v", err)
 				}
@@ -355,9 +354,10 @@ func TestShellOutputFormatting(t *testing.T) {
 			for _, key := range keys {
 				value := tt.envVars[key]
 				var line string
-				if tt.shell == "bash" {
+				switch tt.shell {
+				case "bash":
 					line = fmt.Sprintf("export %s=%s", key, value)
-				} else if tt.shell == "fish" {
+				case "fish":
 					line = fmt.Sprintf("set -x %s %s", key, value)
 				}
 				result = append(result, line)
@@ -385,7 +385,7 @@ func TestConfigInitialization(t *testing.T) {
 
 	// Test with minimal config
 	minimalConfig := `version: 1`
-	err := ioutil.WriteFile(configPath, []byte(minimalConfig), 0644)
+	err := os.WriteFile(configPath, []byte(minimalConfig), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
 	}

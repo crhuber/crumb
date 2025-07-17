@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -138,7 +137,7 @@ path_sync:
   remap: {}
 env: {}`
 
-		err := ioutil.WriteFile(configPath, []byte(defaultConfig), 0644)
+		err := os.WriteFile(configPath, []byte(defaultConfig), 0644)
 		if err != nil {
 			t.Fatalf("Failed to write config file: %v", err)
 		}
@@ -149,7 +148,7 @@ env: {}`
 		}
 
 		// Check file contents
-		content, err := ioutil.ReadFile(configPath)
+		content, err := os.ReadFile(configPath)
 		if err != nil {
 			t.Fatalf("Failed to read config file: %v", err)
 		}
@@ -222,7 +221,7 @@ env:
     path: "/prod/billing-svc/api/secret"`
 
 	configPath := filepath.Join(tempDir, "test.yaml")
-	err := ioutil.WriteFile(configPath, []byte(configContent), 0644)
+	err := os.WriteFile(configPath, []byte(configContent), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
 	}

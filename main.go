@@ -759,9 +759,10 @@ func exportCommand(c *cli.Context) error {
 	if crumConfig.PathSync.Path != "" {
 		// Add comment for clarity
 		comment := fmt.Sprintf("# Exported from %s", crumConfig.PathSync.Path)
-		if shell == "bash" {
+		switch shell {
+		case "bash":
 			fmt.Println(comment)
-		} else if shell == "fish" {
+		case "fish":
 			fmt.Println(comment)
 		}
 
@@ -811,9 +812,10 @@ func exportCommand(c *cli.Context) error {
 	// Output environment variables
 	for _, key := range keys {
 		value := envVars[key]
-		if shell == "bash" {
+		switch shell {
+		case "bash":
 			fmt.Printf("export %s=%s\n", key, value)
-		} else if shell == "fish" {
+		case "fish":
 			fmt.Printf("set -x %s %s\n", key, value)
 		}
 	}
