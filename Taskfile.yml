@@ -1,7 +1,7 @@
 version: '3'
 
 vars:
-  BINARY_NAME: crum
+  BINARY_NAME: crumb
   BUILD_DIR: ./build
   COVERAGE_DIR: ./coverage
 

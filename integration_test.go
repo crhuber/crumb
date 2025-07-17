@@ -23,7 +23,7 @@ func TestSetupCommandIntegration(t *testing.T) {
 
 	// Test setup command with valid keys
 	t.Run("config directory creation", func(t *testing.T) {
-		configDir := filepath.Join(tempDir, ".config", "crum")
+		configDir := filepath.Join(tempDir, ".config", "crumb")
 		err := os.MkdirAll(configDir, 0700)
 		if err != nil {
 			t.Fatalf("Failed to create config directory: %v", err)
@@ -127,7 +127,7 @@ func TestInitCommandIntegration(t *testing.T) {
 	}
 
 	// Test init command
-	configPath := filepath.Join(tempDir, ".crum.yaml")
+	configPath := filepath.Join(tempDir, ".crumb.yaml")
 
 	t.Run("create new config", func(t *testing.T) {
 		// Mock the init command logic
@@ -227,7 +227,7 @@ env:
 	}
 
 	// Test config loading
-	config, err := loadCrumConfig(configPath)
+	config, err := loadCrumbConfig(configPath)
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}

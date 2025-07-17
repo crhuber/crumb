@@ -1,7 +1,7 @@
-# GoReleaser configuration for crum
+# GoReleaser configuration for crumb
 version: 2
 
-project_name: crum
+project_name: crumb
 
 before:
   hooks:
@@ -18,7 +18,7 @@ builds:
       - amd64
       - arm64
     main: .
-    binary: crum
+    binary: crumb
     ldflags:
       - -s -w
       - -X main.version={{.Version}}
@@ -67,14 +67,14 @@ changelog:
 release:
   github:
     owner: crhuber
-    name: crum
+    name: crumb
   draft: false
   prerelease: auto
   mode: replace
   header: |
-    ## Crum {{ .Tag }}
+    ## Crumb {{ .Tag }}
 
-    This release includes Crum.
+    This release includes Crumb.
 
     ### Installation
 

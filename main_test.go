@@ -10,7 +10,7 @@ import (
 
 // Test helper functions
 func createTempDir(t *testing.T) string {
-	tempDir, err := os.MkdirTemp("", "crum_test")
+	tempDir, err := os.MkdirTemp("", "crumb_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestGetFilteredKeys(t *testing.T) {
 }
 
 // Test YAML configuration parsing
-func TestLoadCrumConfig(t *testing.T) {
+func TestLoadCrumbConfig(t *testing.T) {
 	tempDir := createTempDir(t)
 	defer os.RemoveAll(tempDir)
 
@@ -214,7 +214,7 @@ func TestLoadCrumConfig(t *testing.T) {
 		content     string
 		wantErr     bool
 		errContains string
-		validate    func(*testing.T, *CrumConfig)
+		validate    func(*testing.T, *CrumbConfig)
 	}{
 		{
 			name:       "valid config",
@@ -228,7 +228,7 @@ env:
   DATABASE_URL:
     path: "/prod/billing-svc/db/url"`,
 			wantErr: false,
-			validate: func(t *testing.T, config *CrumConfig) {
+			validate: func(t *testing.T, config *CrumbConfig) {
 				if config.Version != "1" {
 					t.Errorf("Expected version '1', got '%s'", config.Version)
 				}
@@ -279,17 +279,17 @@ env: {}`,
 				}
 			}
 
-			config, err := loadCrumConfig(configPath)
+			config, err := loadCrumbConfig(configPath)
 
 			if tt.wantErr {
 				if err == nil {
-					t.Errorf("loadCrumConfig() expected error but got none")
+					t.Errorf("loadCrumbConfig() expected error but got none")
 				} else if !strings.Contains(err.Error(), tt.errContains) {
-					t.Errorf("loadCrumConfig() error = %v, want error containing %q", err, tt.errContains)
+					t.Errorf("loadCrumbConfig() error = %v, want error containing %q", err, tt.errContains)
 				}
 			} else {
 				if err != nil {
-					t.Errorf("loadCrumConfig() unexpected error = %v", err)
+					t.Errorf("loadCrumbConfig() unexpected error = %v", err)
 				}
 				if config != nil && tt.validate != nil {
 					tt.validate(t, config)
@@ -390,9 +390,9 @@ func TestConfigInitialization(t *testing.T) {
 		t.Fatalf("Failed to write test config: %v", err)
 	}
 
-	config, err := loadCrumConfig(configPath)
+	config, err := loadCrumbConfig(configPath)
 	if err != nil {
-		t.Fatalf("loadCrumConfig() failed: %v", err)
+		t.Fatalf("loadCrumbConfig() failed: %v", err)
 	}
 
 	// Test that maps are initialized

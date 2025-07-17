@@ -1,10 +1,10 @@
-# Crum - Secure API Key Management Tool
+# Crumb - Secure API Key Management Tool
 
-`crum` is a command line tool designed to securely store, manage, and export API keys and secrets for developers. It uses an encrypted plain text file as the backend, leveraging the `age` encryption library with SSH public/private key pairs for encryption and decryption.
+`crumb` is a command line tool designed to securely store, manage, and export API keys and secrets for developers. It uses an encrypted plain text file as the backend, leveraging the `age` encryption library with SSH public/private key pairs for encryption and decryption.
 
 ## Installation
 
-1. Download and add binary to $PATH from https://github.com/crhuber/crum/releases
+1. Download and add binary to $PATH from https://github.com/crhuber/crumb/releases
 
 
 ## Usage
@@ -14,16 +14,16 @@
 The `setup` command initializes the secure storage backend.
 
 ```bash
-./crum setup
+./crumb setup
 ```
 
 This command:
-- Creates a directory at `~/.config/crum/` if it doesn't exist
+- Creates a directory at `~/.config/crumb/` if it doesn't exist
 - Prompts for your SSH public key path (e.g., `~/.ssh/id_ed25519.pub`)
 - Prompts for your SSH private key path (e.g., `~/.ssh/id_ed25519`)
 - Validates that the provided keys are of type `ssh-rsa` or `ssh-ed25519`
-- Creates `~/.config/crum/config.yaml` with the key paths
-- Creates an empty encrypted secrets file at `~/.config/crum/secrets`
+- Creates `~/.config/crumb/config.yaml` with the key paths
+- Creates an empty encrypted secrets file at `~/.config/crumb/secrets`
 - Prompts for confirmation if files already exist
 
 #### Prerequisites
@@ -41,12 +41,12 @@ ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
 #### Example Setup Session
 
 ```bash
-$ ./crum setup
+$ ./crumb setup
 Enter path to SSH public key (e.g., ~/.ssh/id_ed25519.pub): ~/.ssh/id_ed25519.pub
 Enter path to SSH private key (e.g., ~/.ssh/id_ed25519): ~/.ssh/id_ed25519
 Setup completed successfully!
-Config file: /Users/username/.config/crum/config.yaml
-Secrets file: /Users/username/.config/crum/secrets
+Config file: /Users/username/.config/crumb/config.yaml
+Secrets file: /Users/username/.config/crumb/secrets
 ```
 
 ### List Command
@@ -54,7 +54,7 @@ Secrets file: /Users/username/.config/crum/secrets
 The `ls` command lists all stored secret keys, optionally filtered by path.
 
 ```bash
-./crum ls [path]
+./crumb ls [path]
 ```
 
 This command:
@@ -67,7 +67,7 @@ This command:
 
 ```bash
 # List all secrets
-$ ./crum ls
+$ ./crumb ls
 /any/other/mykey
 /any/path/mykey
 /prod/api_key
@@ -76,22 +76,22 @@ $ ./crum ls
 /test/mykey
 
 # Filter by path prefix
-$ ./crum ls /prod
+$ ./crumb ls /prod
 /prod/api_key
 /prod/auth-svc/secret
 /prod/billing-svc/api_key
 
 # Filter with partial matching
-$ ./crum ls /any
+$ ./crumb ls /any
 /any/other/mykey
 /any/path/mykey
 
 # No secrets found
-$ ./crum ls /nonexistent
+$ ./crumb ls /nonexistent
 No secrets found matching path: /nonexistent
 
 # Empty secrets file
-$ ./crum ls
+$ ./crumb ls
 No secrets found
 ```
 
@@ -100,7 +100,7 @@ No secrets found
 The `set` command adds or updates a secret key-value pair.
 
 ```bash
-./crum set <key-path> <value>
+./crumb set <key-path> <value>
 ```
 
 This command:
@@ -114,20 +114,20 @@ This command:
 
 ```bash
 # Add a new secret
-$ ./crum set /prod/api_key secret123
+$ ./crumb set /prod/api_key secret123
 Successfully set key: /prod/api_key
 
 # Update an existing secret (with confirmation)
-$ ./crum set /prod/api_key newsecret456
+$ ./crumb set /prod/api_key newsecret456
 Key '/prod/api_key' already exists with value: secret123
 key already exists. Overwrite? (y/n): y
 Successfully set key: /prod/api_key
 
 # Invalid key path examples
-$ ./crum set invalid_key value
+$ ./crumb set invalid_key value
 Error: key path must start with '/'
 
-$ ./crum set "/test/key with spaces" value
+$ ./crumb set "/test/key with spaces" value
 Error: key path cannot contain spaces
 ```
 
@@ -136,7 +136,7 @@ Error: key path cannot contain spaces
 The `get` command retrieves a secret by its key path.
 
 ```bash
-./crum get <key-path> [--show]
+./crumb get <key-path> [--show]
 ```
 
 This command:
@@ -150,22 +150,22 @@ This command:
 
 ```bash
 # Get a secret (masked value)
-$ ./crum get /prod/api_key
+$ ./crumb get /prod/api_key
 /prod/api_key=****
 
 # Get a secret with actual value
-$ ./crum get --show /prod/api_key
+$ ./crumb get --show /prod/api_key
 /prod/api_key=secret123
 
 # Key not found
-$ ./crum get /nonexistent/key
+$ ./crumb get /nonexistent/key
 Key not found.
 
 # Invalid key path
-$ ./crum get invalid_key
+$ ./crumb get invalid_key
 Error: key path must start with '/'
 
-$ ./crum get "/test/key with spaces"
+$ ./crumb get "/test/key with spaces"
 Error: key path cannot contain spaces
 ```
 
@@ -174,11 +174,11 @@ Error: key path cannot contain spaces
 The `init` command creates a YAML configuration file in the current directory.
 
 ```bash
-./crum init
+./crumb init
 ```
 
 This command:
-- Creates a `.crum.yaml` file in the current directory
+- Creates a `.crumb.yaml` file in the current directory
 - Uses a default structure with empty configuration
 - Prompts for confirmation if the file already exists
 - Validates the YAML structure before writing
@@ -186,24 +186,24 @@ This command:
 #### Example Usage
 
 ```bash
-# Create a new .crum.yaml file
-$ ./crum init
-Successfully created .crum.yaml
+# Create a new .crumb.yaml file
+$ ./crumb init
+Successfully created .crumb.yaml
 
 # File already exists (with confirmation)
-$ ./crum init
-Config file .crum.yaml already exists. Overwrite? (y/n): y
-Successfully created .crum.yaml
+$ ./crumb init
+Config file .crumb.yaml already exists. Overwrite? (y/n): y
+Successfully created .crumb.yaml
 
 # Reject overwrite
-$ ./crum init
-Config file .crum.yaml already exists. Overwrite? (y/n): n
+$ ./crumb init
+Config file .crumb.yaml already exists. Overwrite? (y/n): n
 Operation cancelled.
 ```
 
 #### Default Configuration Structure
 
-The created `.crum.yaml` file contains:
+The created `.crumb.yaml` file contains:
 
 ```yaml
 version: "1.0"
@@ -223,7 +223,7 @@ This structure allows you to configure:
 The `delete` command deletes a secret key-value pair from the encrypted file.
 
 ```bash
-./crum delete <key-path>
+./crumb delete <key-path>
 ```
 
 This command:
@@ -238,37 +238,37 @@ This command:
 
 ```bash
 # Delete a secret (with confirmation)
-$ ./crum delete /prod/billing-svc/vars/mg
+$ ./crumb delete /prod/billing-svc/vars/mg
 Type the key path to confirm deletion: /prod/billing-svc/vars/mg
 Successfully deleted key: /prod/billing-svc/vars/mg
 
 # Wrong confirmation (deletion cancelled)
-$ ./crum delete /prod/api_key
+$ ./crumb delete /prod/api_key
 Type the key path to confirm deletion: /wrong/path
 Confirmation failed. Deletion cancelled.
 
 # Key not found
-$ ./crum delete /nonexistent/key
+$ ./crumb delete /nonexistent/key
 Key not found.
 
 # Invalid key path
-$ ./crum delete invalid_key
+$ ./crumb delete invalid_key
 Error: key path must start with '/'
 
-$ ./crum delete "/test/key with spaces"
+$ ./crumb delete "/test/key with spaces"
 Error: key path cannot contain spaces
 ```
 
 ### Export Command
 
-The `export` command exports secrets as shell-compatible environment variable assignments based on the `.crum.yaml` config file.
+The `export` command exports secrets as shell-compatible environment variable assignments based on the `.crumb.yaml` config file.
 
 ```bash
-./crum export [--shell=bash|fish] [-f config-file]
+./crumb export [--shell=bash|fish] [-f config-file]
 ```
 
 This command:
-- Reads the `.crum.yaml` configuration file from the current directory (or a custom path with `-f`)
+- Reads the `.crumb.yaml` configuration file from the current directory (or a custom path with `-f`)
 - Validates the YAML structure and paths
 - Decrypts the secrets file using the private key
 - Processes the `path_sync` section to export secrets matching a path prefix
@@ -279,7 +279,7 @@ This command:
 
 #### Example Usage
 
-First, create a `.crum.yaml` configuration file:
+First, create a `.crumb.yaml` configuration file:
 
 ```yaml
 version: 1
@@ -300,7 +300,7 @@ Then export the secrets:
 
 ```bash
 # Export for bash (default)
-$ ./crum export
+$ ./crumb export
 # Exported from /prod/billing-svc
 export API_SECRET=secret123
 export DATABASE_URL=postgres://user:pass@localhost/db
@@ -308,7 +308,7 @@ export MG_KEY=mgsecret
 export STRIPE_KEY=stripesecret
 
 # Export for fish shell
-$ ./crum export --shell=fish
+$ ./crumb export --shell=fish
 # Exported from /prod/billing-svc
 set -x API_SECRET secret123
 set -x DATABASE_URL postgres://user:pass@localhost/db
@@ -316,17 +316,17 @@ set -x MG_KEY mgsecret
 set -x STRIPE_KEY stripesecret
 
 # Use a custom config file
-$ ./crum export -f my-project.yaml
+$ ./crumb export -f my-project.yaml
 # Exported from /prod/my-project
 export MY_SECRET=value123
 
 # Use custom config file with long flag
-$ ./crum export --file my-project.yaml --shell=fish
+$ ./crumb export --file my-project.yaml --shell=fish
 # Exported from /prod/my-project
 set -x MY_SECRET value123
 
 # Source the output directly
-$ source <(./crum export)
+$ source <(./crumb export)
 $ echo $MG_KEY
 mgsecret
 ```
@@ -347,8 +347,8 @@ All major commands are now implemented. See the command documentation above for 
 
 The tool creates two configuration files:
 
-1. `~/.config/crum/config.yaml` - Stores SSH key paths
-2. `~/.config/crum/secrets` - Encrypted key-value store
+1. `~/.config/crumb/config.yaml` - Stores SSH key paths
+2. `~/.config/crumb/secrets` - Encrypted key-value store
 
 
 ## Development

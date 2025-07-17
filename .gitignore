@@ -1,6 +1,9 @@
 prd.markdown
 todo.markdown
-crum
-.crum.yaml
+# Compiled binary
+dist/
+build/
+crumb
+.crumb.yaml
 ./build/
 ./coverage/

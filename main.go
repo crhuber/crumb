@@ -25,14 +25,14 @@ var (
 	date    = "unknown"
 )
 
-// Config represents the configuration stored in ~/.config/crum/config.yaml
+// Config represents the configuration stored in ~/.config/crumb/config.yaml
 type Config struct {
 	PublicKeyPath  string `yaml:"public_key_path"`
 	PrivateKeyPath string `yaml:"private_key_path"`
 }
 
-// CrumConfig represents the per-project configuration in .crum.yaml
-type CrumConfig struct {
+// CrumbConfig represents the per-project configuration in .crumb.yaml
+type CrumbConfig struct {
 	Version  string               `yaml:"version"`
 	PathSync PathSync             `yaml:"path_sync"`
 	Env      map[string]EnvConfig `yaml:"env"`
@@ -52,7 +52,7 @@ func main() {
 		fmt.Printf("version=%s commit=%s date=%s\n", cCtx.App.Version, commit, date)
 	}
 	app := &cli.App{
-		Name:    "crum",
+		Name:    "crumb",
 		Usage:   "Securely store, manage, and export API keys and secrets",
 		Version: version,
 		Commands: []*cli.Command{
@@ -108,8 +108,8 @@ func main() {
 					&cli.StringFlag{
 						Name:    "file",
 						Aliases: []string{"f"},
-						Usage:   "Configuration file to use (default: .crum.yaml)",
-						Value:   ".crum.yaml",
+						Usage:   "Configuration file to use (default: .crumb.yaml)",
+						Value:   ".crumb.yaml",
 					},
 				},
 				Action: exportCommand,
@@ -124,8 +124,8 @@ func main() {
 }
 
 func setupCommand(_ *cli.Context) error {
-	// Create ~/.config/crum directory if it doesn't exist
-	configDir := filepath.Join(os.Getenv("HOME"), ".config", "crum")
+	// Create ~/.config/crumb directory if it doesn't exist
+	configDir := filepath.Join(os.Getenv("HOME"), ".config", "crumb")
 	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
@@ -372,10 +372,10 @@ func validateKeyPath(keyPath string) error {
 }
 
 func loadConfig() (*Config, error) {
-	configPath := filepath.Join(os.Getenv("HOME"), ".config", "crum", "config.yaml")
+	configPath := filepath.Join(os.Getenv("HOME"), ".config", "crumb", "config.yaml")
 
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("configuration not found. Run 'crum setup' first")
+		return nil, fmt.Errorf("configuration not found. Run 'crumb setup' first")
 	}
 
 	configData, err := os.ReadFile(configPath)
@@ -392,7 +392,7 @@ func loadConfig() (*Config, error) {
 }
 
 func loadSecrets(privateKeyPath string) (map[string]string, error) {
-	secretsPath := filepath.Join(os.Getenv("HOME"), ".config", "crum", "secrets")
+	secretsPath := filepath.Join(os.Getenv("HOME"), ".config", "crumb", "secrets")
 
 	if _, err := os.Stat(secretsPath); os.IsNotExist(err) {
 		return make(map[string]string), nil
@@ -449,7 +449,7 @@ func loadSecrets(privateKeyPath string) (map[string]string, error) {
 }
 
 func saveSecrets(secrets map[string]string, publicKeyPath string) error {
-	secretsPath := filepath.Join(os.Getenv("HOME"), ".config", "crum", "secrets")
+	secretsPath := filepath.Join(os.Getenv("HOME"), ".config", "crumb", "secrets")
 
 	// Read public key
 	publicKeyData, err := os.ReadFile(publicKeyPath)
@@ -587,7 +587,7 @@ func listCommand(c *cli.Context) error {
 func setCommand(c *cli.Context) error {
 	// Check arguments
 	if c.Args().Len() != 2 {
-		return fmt.Errorf("usage: crum set <key-path> <value>")
+		return fmt.Errorf("usage: crumb set <key-path> <value>")
 	}
 
 	keyPath := c.Args().Get(0)
@@ -632,9 +632,9 @@ func setCommand(c *cli.Context) error {
 }
 
 func initCommand(_ *cli.Context) error {
-	configFileName := ".crum.yaml"
+	configFileName := ".crumb.yaml"
 
-	// Check if .crum.yaml already exists
+	// Check if .crumb.yaml already exists
 	if _, err := os.Stat(configFileName); err == nil {
 		if !confirmOverwrite(fmt.Sprintf("Config file %s", configFileName)) {
 			fmt.Println("Operation cancelled.")
@@ -643,7 +643,7 @@ func initCommand(_ *cli.Context) error {
 	}
 
 	// Create default config structure
-	defaultConfig := CrumConfig{
+	defaultConfig := CrumbConfig{
 		Version: "1.0",
 		PathSync: PathSync{
 			Path:  "",
@@ -670,7 +670,7 @@ func initCommand(_ *cli.Context) error {
 func deleteCommand(c *cli.Context) error {
 	// Check arguments
 	if c.Args().Len() != 1 {
-		return fmt.Errorf("usage: crum delete <key-path>")
+		return fmt.Errorf("usage: crumb delete <key-path>")
 	}
 
 	keyPath := c.Args().Get(0)
@@ -734,8 +734,8 @@ func exportCommand(c *cli.Context) error {
 	// Get config file path from flag
 	configFile := c.String("file")
 
-	// Load .crum.yaml configuration
-	crumConfig, err := loadCrumConfig(configFile)
+	// Load .crumb.yaml configuration
+	crumbConfig, err := loadCrumbConfig(configFile)
 	if err != nil {
 		return err
 	}
@@ -756,9 +756,9 @@ func exportCommand(c *cli.Context) error {
 	envVars := make(map[string]string)
 
 	// Process path_sync section
-	if crumConfig.PathSync.Path != "" {
+	if crumbConfig.PathSync.Path != "" {
 		// Add comment for clarity
-		comment := fmt.Sprintf("# Exported from %s", crumConfig.PathSync.Path)
+		comment := fmt.Sprintf("# Exported from %s", crumbConfig.PathSync.Path)
 		switch shell {
 		case "bash":
 			fmt.Println(comment)
@@ -767,7 +767,7 @@ func exportCommand(c *cli.Context) error {
 		}
 
 		// Find all secrets that match the path prefix
-		pathPrefix := strings.TrimSuffix(crumConfig.PathSync.Path, "/")
+		pathPrefix := strings.TrimSuffix(crumbConfig.PathSync.Path, "/")
 		for secretPath, secretValue := range secrets {
 			if strings.HasPrefix(secretPath, pathPrefix) {
 				// Extract the key name from the path
@@ -783,14 +783,14 @@ func exportCommand(c *cli.Context) error {
 	}
 
 	// Process env section
-	for envVarName, envConfig := range crumConfig.Env {
+	for envVarName, envConfig := range crumbConfig.Env {
 		if secretValue, exists := secrets[envConfig.Path]; exists {
 			envVars[envVarName] = secretValue
 		}
 	}
 
 	// Apply remap mappings
-	for originalKey, newKey := range crumConfig.PathSync.Remap {
+	for originalKey, newKey := range crumbConfig.PathSync.Remap {
 		if value, exists := envVars[originalKey]; exists {
 			envVars[newKey] = value
 			delete(envVars, originalKey)
@@ -826,7 +826,7 @@ func exportCommand(c *cli.Context) error {
 func getCommand(c *cli.Context) error {
 	// Check arguments
 	if c.Args().Len() != 1 {
-		return fmt.Errorf("usage: crum get <key-path>")
+		return fmt.Errorf("usage: crumb get <key-path>")
 	}
 
 	keyPath := c.Args().Get(0)
@@ -908,7 +908,7 @@ func matchesPathFilter(key, pathFilter string) bool {
 	return strings.HasPrefix(key, pathFilter)
 }
 
-func loadCrumConfig(configFileName string) (*CrumConfig, error) {
+func loadCrumbConfig(configFileName string) (*CrumbConfig, error) {
 	// Check if config file exists
 	if _, err := os.Stat(configFileName); os.IsNotExist(err) {
 		return nil, fmt.Errorf("no %s found", configFileName)
@@ -921,7 +921,7 @@ func loadCrumConfig(configFileName string) (*CrumConfig, error) {
 	}
 
 	// Parse YAML
-	var config CrumConfig
+	var config CrumbConfig
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse %s: %v", configFileName, err)
 	}
