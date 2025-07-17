@@ -6,7 +6,11 @@
 
 1. Download and add binary to $PATH from https://github.com/crhuber/crumb/releases
 
+OR  use [kelp](https://github.com/crhuber/kelp)
 
+```bash
+kelp add -i crhuber/crum
+```
 ## Usage
 
 ### Setup Command
@@ -14,7 +18,7 @@
 The `setup` command initializes the secure storage backend.
 
 ```bash
-./crumb setup
+crumb setup
 ```
 
 This command:
@@ -41,7 +45,7 @@ ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
 #### Example Setup Session
 
 ```bash
-$ ./crumb setup
+$ crumb setup
 Enter path to SSH public key (e.g., ~/.ssh/id_ed25519.pub): ~/.ssh/id_ed25519.pub
 Enter path to SSH private key (e.g., ~/.ssh/id_ed25519): ~/.ssh/id_ed25519
 Setup completed successfully!
@@ -54,7 +58,7 @@ Secrets file: /Users/username/.config/crumb/secrets
 The `ls` command lists all stored secret keys, optionally filtered by path.
 
 ```bash
-./crumb ls [path]
+crumb ls [path]
 ```
 
 This command:
@@ -67,7 +71,7 @@ This command:
 
 ```bash
 # List all secrets
-$ ./crumb ls
+$ crumb ls
 /any/other/mykey
 /any/path/mykey
 /prod/api_key
@@ -76,22 +80,22 @@ $ ./crumb ls
 /test/mykey
 
 # Filter by path prefix
-$ ./crumb ls /prod
+$ crumb ls /prod
 /prod/api_key
 /prod/auth-svc/secret
 /prod/billing-svc/api_key
 
 # Filter with partial matching
-$ ./crumb ls /any
+$ crumb ls /any
 /any/other/mykey
 /any/path/mykey
 
 # No secrets found
-$ ./crumb ls /nonexistent
+$ crumb ls /nonexistent
 No secrets found matching path: /nonexistent
 
 # Empty secrets file
-$ ./crumb ls
+$ crumb ls
 No secrets found
 ```
 
@@ -100,7 +104,7 @@ No secrets found
 The `set` command adds or updates a secret key-value pair.
 
 ```bash
-./crumb set <key-path> <value>
+crumb set <key-path> <value>
 ```
 
 This command:
@@ -114,20 +118,20 @@ This command:
 
 ```bash
 # Add a new secret
-$ ./crumb set /prod/api_key secret123
+$ crumb set /prod/api_key secret123
 Successfully set key: /prod/api_key
 
 # Update an existing secret (with confirmation)
-$ ./crumb set /prod/api_key newsecret456
+$ crumb set /prod/api_key newsecret456
 Key '/prod/api_key' already exists with value: secret123
 key already exists. Overwrite? (y/n): y
 Successfully set key: /prod/api_key
 
 # Invalid key path examples
-$ ./crumb set invalid_key value
+$ crumb set invalid_key value
 Error: key path must start with '/'
 
-$ ./crumb set "/test/key with spaces" value
+$ crumb set "/test/key with spaces" value
 Error: key path cannot contain spaces
 ```
 
@@ -136,7 +140,7 @@ Error: key path cannot contain spaces
 The `get` command retrieves a secret by its key path.
 
 ```bash
-./crumb get <key-path> [--show]
+crumb get <key-path> [--show]
 ```
 
 This command:
@@ -150,22 +154,22 @@ This command:
 
 ```bash
 # Get a secret (masked value)
-$ ./crumb get /prod/api_key
+$ crumb get /prod/api_key
 /prod/api_key=****
 
 # Get a secret with actual value
-$ ./crumb get --show /prod/api_key
+$ crumb get --show /prod/api_key
 /prod/api_key=secret123
 
 # Key not found
-$ ./crumb get /nonexistent/key
+$ crumb get /nonexistent/key
 Key not found.
 
 # Invalid key path
-$ ./crumb get invalid_key
+$ crumb get invalid_key
 Error: key path must start with '/'
 
-$ ./crumb get "/test/key with spaces"
+$ crumb get "/test/key with spaces"
 Error: key path cannot contain spaces
 ```
 
@@ -174,7 +178,7 @@ Error: key path cannot contain spaces
 The `init` command creates a YAML configuration file in the current directory.
 
 ```bash
-./crumb init
+crumb init
 ```
 
 This command:
@@ -187,16 +191,16 @@ This command:
 
 ```bash
 # Create a new .crumb.yaml file
-$ ./crumb init
+$ crumb init
 Successfully created .crumb.yaml
 
 # File already exists (with confirmation)
-$ ./crumb init
+$ crumb init
 Config file .crumb.yaml already exists. Overwrite? (y/n): y
 Successfully created .crumb.yaml
 
 # Reject overwrite
-$ ./crumb init
+$ crumb init
 Config file .crumb.yaml already exists. Overwrite? (y/n): n
 Operation cancelled.
 ```
@@ -222,7 +226,10 @@ This structure allows you to configure:
 
 You can change what finally gets exported to shell by using `path_sync.remap` using the following format:
 
-```
+```yaml
+version: "1.0"
+path_sync:
+  path: "/some/path"
   remap: {
         "FROM": "TO"
     }
@@ -230,14 +237,17 @@ You can change what finally gets exported to shell by using `path_sync.remap` us
 
 
 ie:
-```
+```yaml
+version: "1.0"
+path_sync:
+  path: "/some/path"
     remap: {
         "SOME-SECRET-KEY": "MY-KEY"
     }
 ```
 will result in SOME-SECRET-KEY being exported as MY-KEY
 
-```
+```bash
 export MY-KEY=******
 ```
 
@@ -246,7 +256,7 @@ export MY-KEY=******
 The `delete` command deletes a secret key-value pair from the encrypted file.
 
 ```bash
-./crumb delete <key-path>
+crumb delete <key-path>
 ```
 
 This command:
@@ -261,24 +271,24 @@ This command:
 
 ```bash
 # Delete a secret (with confirmation)
-$ ./crumb delete /prod/billing-svc/vars/mg
+$ crumb delete /prod/billing-svc/vars/mg
 Type the key path to confirm deletion: /prod/billing-svc/vars/mg
 Successfully deleted key: /prod/billing-svc/vars/mg
 
 # Wrong confirmation (deletion cancelled)
-$ ./crumb delete /prod/api_key
+$ crumb delete /prod/api_key
 Type the key path to confirm deletion: /wrong/path
 Confirmation failed. Deletion cancelled.
 
 # Key not found
-$ ./crumb delete /nonexistent/key
+$ crumb delete /nonexistent/key
 Key not found.
 
 # Invalid key path
-$ ./crumb delete invalid_key
+$ crumb delete invalid_key
 Error: key path must start with '/'
 
-$ ./crumb delete "/test/key with spaces"
+$ crumb delete "/test/key with spaces"
 Error: key path cannot contain spaces
 ```
 
@@ -287,7 +297,7 @@ Error: key path cannot contain spaces
 The `export` command exports secrets as shell-compatible environment variable assignments based on the `.crumb.yaml` config file.
 
 ```bash
-./crumb export [--shell=bash|fish] [-f config-file]
+crumb export [--shell=bash|fish] [-f config-file]
 ```
 
 This command:
@@ -323,7 +333,7 @@ Then export the secrets:
 
 ```bash
 # Export for bash (default)
-$ ./crumb export
+$ crumb export
 # Exported from /prod/billing-svc
 export API_SECRET=secret123
 export DATABASE_URL=postgres://user:pass@localhost/db
@@ -331,7 +341,7 @@ export MG_KEY=mgsecret
 export STRIPE_KEY=stripesecret
 
 # Export for fish shell
-$ ./crumb export --shell=fish
+$ crumb export --shell=fish
 # Exported from /prod/billing-svc
 set -x API_SECRET secret123
 set -x DATABASE_URL postgres://user:pass@localhost/db
@@ -339,17 +349,17 @@ set -x MG_KEY mgsecret
 set -x STRIPE_KEY stripesecret
 
 # Use a custom config file
-$ ./crumb export -f my-project.yaml
+$ crumb export -f my-project.yaml
 # Exported from /prod/my-project
 export MY_SECRET=value123
 
 # Use custom config file with long flag
-$ ./crumb export --file my-project.yaml --shell=fish
+$ crumb export --file my-project.yaml --shell=fish
 # Exported from /prod/my-project
 set -x MY_SECRET value123
 
 # Source the output directly
-$ source <(./crumb export)
+$ source <(crumb export)
 $ echo $MG_KEY
 mgsecret
 ```
