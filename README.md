@@ -364,9 +364,11 @@ $ echo $MG_KEY
 mgsecret
 ```
 
-### Other Commands
+#### Local shell population
 
-All major commands are now implemented. See the command documentation above for full usage details.
+```bash
+`eval "$(crumb export)"`
+```
 
 ## Security Features
 

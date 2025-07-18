@@ -774,6 +774,7 @@ func exportCommand(c *cli.Context) error {
 				keyName := strings.TrimPrefix(secretPath, pathPrefix)
 				keyName = strings.TrimPrefix(keyName, "/")
 				keyName = strings.ToUpper(strings.ReplaceAll(keyName, "/", "_"))
+				keyName = strings.ReplaceAll(keyName, "-", "_")
 
 				if keyName != "" {
 					envVars[keyName] = secretValue
@@ -785,15 +786,21 @@ func exportCommand(c *cli.Context) error {
 	// Process env section
 	for envVarName, envConfig := range crumbConfig.Env {
 		if secretValue, exists := secrets[envConfig.Path]; exists {
-			envVars[envVarName] = secretValue
+			// Sanitize environment variable name
+			sanitizedEnvVarName := strings.ToUpper(strings.ReplaceAll(envVarName, "-", "_"))
+			envVars[sanitizedEnvVarName] = secretValue
 		}
 	}
 
 	// Apply remap mappings
 	for originalKey, newKey := range crumbConfig.PathSync.Remap {
-		if value, exists := envVars[originalKey]; exists {
-			envVars[newKey] = value
-			delete(envVars, originalKey)
+		// Sanitize both original and new key names
+		sanitizedOriginalKey := strings.ToUpper(strings.ReplaceAll(originalKey, "-", "_"))
+		sanitizedNewKey := strings.ToUpper(strings.ReplaceAll(newKey, "-", "_"))
+		
+		if value, exists := envVars[sanitizedOriginalKey]; exists {
+			envVars[sanitizedNewKey] = value
+			delete(envVars, sanitizedOriginalKey)
 		}
 	}
 

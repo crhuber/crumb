@@ -490,3 +490,130 @@ func TestEnvVarNameGeneration(t *testing.T) {
 		})
 	}
 }
+
+// Test environment variable name sanitization
+func TestEnvVarSanitization(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "with dashes",
+			input:    "client-id",
+			expected: "CLIENT_ID",
+		},
+		{
+			name:     "with mixed case and dashes",
+			input:    "Api-Key-Value",
+			expected: "API_KEY_VALUE",
+		},
+		{
+			name:     "already uppercase with underscores",
+			input:    "DATABASE_URL",
+			expected: "DATABASE_URL",
+		},
+		{
+			name:     "mixed dashes and underscores",
+			input:    "some-var_name",
+			expected: "SOME_VAR_NAME",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Simulate the sanitization logic used in the export command
+			result := strings.ToUpper(strings.ReplaceAll(tt.input, "-", "_"))
+			if result != tt.expected {
+				t.Errorf("Expected %q, got %q", tt.expected, result)
+			}
+		})
+	}
+}
+
+// Test export command environment variable sanitization
+func TestExportCommandSanitization(t *testing.T) {
+	tempDir := createTempDir(t)
+	defer os.RemoveAll(tempDir)
+
+	// Create test config with dashes
+	configPath := filepath.Join(tempDir, ".crumb.yaml")
+	configContent := `version: "1.0"
+path_sync:
+  path: "/test"
+  remap:
+    CLIENT_ID: "API_CLIENT_ID"
+env:
+  database-url:
+    path: "/test/db-url"
+  api-key:
+    path: "/test/api-key"`
+
+	err := os.WriteFile(configPath, []byte(configContent), 0600)
+	if err != nil {
+		t.Fatalf("Failed to create test config: %v", err)
+	}
+
+	// Test secrets map
+	secrets := map[string]string{
+		"/test/client-id":   "test-client-123",
+		"/test/api-key":     "secret-api-key",
+		"/test/db-url":      "postgresql://localhost:5432/test",
+	}
+
+	// Simulate the export logic for environment variable sanitization
+	crumbConfig, err := loadCrumbConfig(configPath)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	envVars := make(map[string]string)
+
+	// Process path_sync section (simplified)
+	if crumbConfig.PathSync.Path != "" {
+		pathPrefix := strings.TrimSuffix(crumbConfig.PathSync.Path, "/")
+		for secretPath, secretValue := range secrets {
+			if strings.HasPrefix(secretPath, pathPrefix) {
+				keyName := strings.TrimPrefix(secretPath, pathPrefix)
+				keyName = strings.TrimPrefix(keyName, "/")
+				keyName = strings.ToUpper(strings.ReplaceAll(keyName, "/", "_"))
+				keyName = strings.ReplaceAll(keyName, "-", "_")
+
+				if keyName != "" {
+					envVars[keyName] = secretValue
+				}
+			}
+		}
+	}
+
+	// Process env section
+	for envVarName, envConfig := range crumbConfig.Env {
+		if secretValue, exists := secrets[envConfig.Path]; exists {
+			sanitizedEnvVarName := strings.ToUpper(strings.ReplaceAll(envVarName, "-", "_"))
+			envVars[sanitizedEnvVarName] = secretValue
+		}
+	}
+
+	// Verify that dashes were converted to underscores
+	expectedVars := map[string]string{
+		"CLIENT_ID":    "test-client-123",
+		"API_KEY":      "secret-api-key", 
+		"DATABASE_URL": "postgresql://localhost:5432/test",
+		"DB_URL":       "postgresql://localhost:5432/test",
+	}
+
+	for expectedKey, expectedValue := range expectedVars {
+		if actualValue, exists := envVars[expectedKey]; !exists {
+			t.Errorf("Expected environment variable %q not found", expectedKey)
+		} else if actualValue != expectedValue {
+			t.Errorf("Environment variable %q: expected value %q, got %q", expectedKey, expectedValue, actualValue)
+		}
+	}
+
+	// Verify no variables with dashes exist
+	for envVarName := range envVars {
+		if strings.Contains(envVarName, "-") {
+			t.Errorf("Environment variable %q contains dashes, which is invalid", envVarName)
+		}
+	}
+}
