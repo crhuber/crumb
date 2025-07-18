@@ -103,6 +103,15 @@ func main() {
 						Name:  "show",
 						Usage: "Display the actual secret value instead of masking it",
 					},
+					&cli.BoolFlag{
+						Name:  "export",
+						Usage: "Output in shell-compatible format for sourcing",
+					},
+					&cli.StringFlag{
+						Name:  "shell",
+						Usage: "Shell format for export (bash or fish)",
+						Value: "bash",
+					},
 				},
 			},
 			{
@@ -963,6 +972,8 @@ func getCommand(c *cli.Context) error {
 
 	keyPath := c.Args().Get(0)
 	showValue := c.Bool("show")
+	exportFormat := c.Bool("export")
+	shell := c.String("shell")
 
 	// Validate key path
 	if err := validateKeyPath(keyPath); err != nil {
@@ -992,7 +1003,22 @@ func getCommand(c *cli.Context) error {
 		return nil
 	}
 
-	// Display the value
+	// Handle export format
+	if exportFormat {
+		// Extract variable name from key path
+		varName := extractVarName(keyPath)
+		switch shell {
+		case "bash":
+			fmt.Printf("export %s=%s\n", varName, value)
+		case "fish":
+			fmt.Printf("set -x %s %s\n", varName, value)
+		default:
+			return fmt.Errorf("unsupported shell format: %s (supported: bash, fish)", shell)
+		}
+		return nil
+	}
+
+	// Display the value (existing behavior)
 	if showValue {
 		fmt.Printf("%s\n", value)
 	} else {
@@ -1042,6 +1068,23 @@ func matchesPathFilter(key, pathFilter string) bool {
 	// This provides partial matching as specified in the PRD
 	// e.g., "/any" matches "/any/path/mykey"
 	return strings.HasPrefix(key, pathFilter)
+}
+
+// extractVarName converts a key path to a valid environment variable name
+func extractVarName(keyPath string) string {
+	// Remove leading slash
+	varName := strings.TrimPrefix(keyPath, "/")
+	
+	// Replace slashes with underscores
+	varName = strings.ReplaceAll(varName, "/", "_")
+	
+	// Replace hyphens with underscores
+	varName = strings.ReplaceAll(varName, "-", "_")
+	
+	// Convert to uppercase
+	varName = strings.ToUpper(varName)
+	
+	return varName
 }
 
 func loadCrumbConfig(configFileName string) (*CrumbConfig, error) {

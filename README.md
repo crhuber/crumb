@@ -173,7 +173,7 @@ Error: key path cannot contain spaces
 The `get` command retrieves a secret by its key path.
 
 ```bash
-crumb get <key-path> [--show]
+crumb get <key-path> [--show] [--export] [--shell=bash|fish]
 ```
 
 This command:
@@ -181,6 +181,9 @@ This command:
 - Decrypts the secrets file using the private key
 - By default, displays `****` to mask the value
 - Supports `--show` flag to display the actual secret value
+- Supports `--export` flag to output in shell-compatible format for sourcing
+- Supports `--shell` flag to select output format when using `--export` (bash or fish, defaulting to bash)
+- When `--export` is used, `--show` is ignored and the secret value is always displayed
 - Requires a full key path (partial paths are not supported)
 
 #### Example Usage
@@ -194,6 +197,23 @@ $ crumb get /prod/api_key
 $ crumb get --show /prod/api_key
 secret123
 
+# Export a secret for bash sourcing
+$ crumb get --export /prod/api_key
+export PROD_API_KEY=secret123
+
+# Export a secret for fish shell
+$ crumb get --export --shell fish /prod/api_key
+set -x PROD_API_KEY secret123
+
+# Export with complex key path
+$ crumb get --export /api/my-service/auth-token
+export API_MY_SERVICE_AUTH_TOKEN=token123
+
+# Source the export directly in bash
+$ eval "$(crumb get --export /prod/api_key)"
+$ echo $PROD_API_KEY
+secret123
+
 # Key not found
 $ crumb get /nonexistent/key
 Key not found.
@@ -204,6 +224,56 @@ Error: key path must start with '/'
 
 $ crumb get "/test/key with spaces"
 Error: key path cannot contain spaces
+
+# Unsupported shell format
+$ crumb get --export --shell zsh /prod/api_key
+Error: unsupported shell format: zsh (supported: bash, fish)
+```
+
+#### Variable Name Conversion
+
+When using the `--export` flag, the key path is automatically converted to a valid environment variable name:
+
+- Leading slash (`/`) is removed
+- Remaining slashes (`/`) are converted to underscores (`_`)
+- Hyphens (`-`) are converted to underscores (`_`)
+- The result is converted to uppercase
+
+Examples:
+- `/api/key` → `API_KEY`
+- `/prod/my-service/auth-token` → `PROD_MY_SERVICE_AUTH_TOKEN`
+- `/billing-svc/vars/mg` → `BILLING_SVC_VARS_MG`
+
+#### Shell Integration
+
+The `--export` flag makes it easy to integrate secrets into shell scripts and workflows:
+
+**Bash:**
+```bash
+# Source a single secret
+eval "$(crumb get --export /api/key)"
+echo "API Key: $API_KEY"
+
+# Source multiple secrets in a script
+#!/bin/bash
+eval "$(crumb get --export /prod/database-url)"
+eval "$(crumb get --export /prod/api-key)"
+eval "$(crumb get --export /prod/stripe-secret)"
+
+# Now use the environment variables
+psql "$PROD_DATABASE_URL" -c "SELECT COUNT(*) FROM users;"
+curl -H "Authorization: Bearer $PROD_API_KEY" https://api.example.com/
+```
+
+**Fish:**
+```fish
+# Source a single secret
+eval (crumb get --export --shell fish /api/key)
+echo "API Key: $API_KEY"
+
+# Source multiple secrets
+eval (crumb get --export --shell fish /prod/database-url)
+eval (crumb get --export --shell fish /prod/api-key)
 ```
 
 ### Init Command
@@ -464,6 +534,12 @@ crumb --profile personal ls
 # Use environment variable for default profile
 export CRUMB_PROFILE=work
 crumb get /company/api-key  # Uses work profile
+
+# Export individual secrets for sourcing
+eval "$(crumb --profile work get --export /company/api-key)"
+eval "$(crumb --profile work get --export /company/db-password)"
+echo $COMPANY_API_KEY
+echo $COMPANY_DB_PASSWORD
 ```
 
 ### Project-Specific Storage
