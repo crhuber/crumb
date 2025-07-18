@@ -992,11 +992,11 @@ func getCommand(c *cli.Context) error {
 		return nil
 	}
 
-	// Display the key and value
+	// Display the value
 	if showValue {
-		fmt.Printf("%s=%s\n", keyPath, value)
+		fmt.Printf("%s\n", value)
 	} else {
-		fmt.Printf("%s=****\n", keyPath)
+		fmt.Println("****")
 	}
 
 	return nil

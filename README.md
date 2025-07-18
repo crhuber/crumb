@@ -179,7 +179,7 @@ crumb get <key-path> [--show]
 This command:
 - Validates the key path (must start with `/`, no spaces or special characters)
 - Decrypts the secrets file using the private key
-- By default, displays the key path and masks the value with `****`
+- By default, displays `****` to mask the value
 - Supports `--show` flag to display the actual secret value
 - Requires a full key path (partial paths are not supported)
 
@@ -188,11 +188,11 @@ This command:
 ```bash
 # Get a secret (masked value)
 $ crumb get /prod/api_key
-/prod/api_key=****
+****
 
 # Get a secret with actual value
 $ crumb get --show /prod/api_key
-/prod/api_key=secret123
+secret123
 
 # Key not found
 $ crumb get /nonexistent/key
@@ -506,7 +506,7 @@ crumb --profile work --storage ~/backups/work-secrets-backup ls
 crumb --profile work ls  # Note the keys you want to backup
 
 # Temporarily use backup storage to set up new secrets
-crumb --profile work --storage ~/backups/work-secrets-backup set /api/key "$(crumb --profile work get --show /api/key | cut -d= -f2)"
+crumb --profile work --storage ~/backups/work-secrets-backup set /api/key "$(crumb --profile work get --show /api/key)"
 
 # Switch work profile to use backup storage permanently
 crumb --profile work storage set ~/backups/work-secrets-backup
