@@ -1074,16 +1074,16 @@ func matchesPathFilter(key, pathFilter string) bool {
 func extractVarName(keyPath string) string {
 	// Remove leading slash
 	varName := strings.TrimPrefix(keyPath, "/")
-	
+
 	// Replace slashes with underscores
 	varName = strings.ReplaceAll(varName, "/", "_")
-	
+
 	// Replace hyphens with underscores
 	varName = strings.ReplaceAll(varName, "-", "_")
-	
+
 	// Convert to uppercase
 	varName = strings.ToUpper(varName)
-	
+
 	return varName
 }
 
