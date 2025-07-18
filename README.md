@@ -11,23 +11,44 @@ OR  use [kelp](https://github.com/crhuber/kelp)
 ```bash
 kelp add -i crhuber/crumb
 ```
+
+## Features
+
+- **Multi-Profile Support**: Manage separate secret stores for work, personal, or different projects
+- **Custom Storage Paths**: Store secrets in different locations per profile
+- **Environment Variables**: Use `CRUMB_PROFILE` and `CRUMB_STORAGE` for easy integration
+- **Global Flags**: Override settings with `--profile` and `--storage` flags
+- **Storage Management**: Built-in commands to configure storage paths per profile
+
+## Global Flags
+
+All commands support these global flags:
+
+- `--profile <name>`: Specify which profile to use (default: "default")
+- `--storage <path>`: Override storage file path for the current command
+
+Environment variables:
+- `CRUMB_PROFILE`: Set the default profile
+- `CRUMB_STORAGE`: Set the default storage path
+
 ## Usage
 
 ### Setup Command
 
-The `setup` command initializes the secure storage backend.
+The `setup` command initializes the secure storage backend for a specific profile.
 
 ```bash
-crumb setup
+crumb setup [--profile <profile-name>]
 ```
 
 This command:
 - Creates a directory at `~/.config/crumb/` if it doesn't exist
 - Prompts for your SSH public key path (e.g., `~/.ssh/id_ed25519.pub`)
 - Prompts for your SSH private key path (e.g., `~/.ssh/id_ed25519`)
+- For non-default profiles, prompts for a custom storage file path
 - Validates that the provided keys are of type `ssh-rsa` or `ssh-ed25519`
-- Creates `~/.config/crumb/config.yaml` with the key paths
-- Creates an empty encrypted secrets file at `~/.config/crumb/secrets`
+- Creates or updates `~/.config/crumb/config.yaml` with the profile configuration
+- Creates an empty encrypted secrets file at the specified storage location
 - Prompts for confirmation if files already exist
 
 #### Prerequisites
@@ -42,15 +63,27 @@ ssh-keygen -t ed25519 -C "your_email@example.com"
 ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
 ```
 
-#### Example Setup Session
+#### Example Setup Sessions
 
+**Default profile setup:**
 ```bash
 $ crumb setup
 Enter path to SSH public key (e.g., ~/.ssh/id_ed25519.pub): ~/.ssh/id_ed25519.pub
 Enter path to SSH private key (e.g., ~/.ssh/id_ed25519): ~/.ssh/id_ed25519
-Setup completed successfully!
+Setup completed successfully for profile 'default'!
 Config file: /Users/username/.config/crumb/config.yaml
-Secrets file: /Users/username/.config/crumb/secrets
+Storage file: /Users/username/.config/crumb/secrets
+```
+
+**Work profile setup:**
+```bash
+$ crumb --profile work setup
+Enter path to SSH public key (e.g., ~/.ssh/work.pub): ~/.ssh/work.pub
+Enter path to SSH private key (e.g., ~/.ssh/work): ~/.ssh/work
+Enter storage file path (e.g., ~/.config/crumb/secrets-work): ~/.config/crumb/work-secrets
+Setup completed successfully for profile 'work'!
+Config file: /Users/username/.config/crumb/config.yaml
+Storage file: /Users/username/.config/crumb/work-secrets
 ```
 
 ### List Command
@@ -292,18 +325,206 @@ $ crumb delete "/test/key with spaces"
 Error: key path cannot contain spaces
 ```
 
+### Storage Management Commands
+
+The `storage` command provides subcommands to manage storage file paths for profiles.
+
+#### Storage Set
+
+Set the storage file path for the current profile:
+
+```bash
+crumb storage set <path> [--profile <profile-name>]
+```
+
+Example:
+```bash
+# Set storage path for work profile
+$ crumb --profile work storage set ~/.config/crumb/work-secrets
+Storage path set to: /Users/username/.config/crumb/work-secrets (profile: work)
+
+# Set storage path for default profile
+$ crumb storage set ~/personal-secrets
+Storage path set to: /Users/username/personal-secrets (profile: default)
+```
+
+#### Storage Get
+
+Show the current storage file path for the current profile:
+
+```bash
+crumb storage get [--profile <profile-name>]
+```
+
+Example:
+```bash
+# Check storage path for work profile
+$ crumb --profile work storage get
+Storage: /Users/username/.config/crumb/work-secrets (profile: work)
+
+# Check storage path for default profile
+$ crumb storage get
+Storage: /Users/username/.config/crumb/secrets (profile: default)
+```
+
+#### Storage Clear
+
+Clear the storage file path for the current profile (reverts to default):
+
+```bash
+crumb storage clear [--profile <profile-name>]
+```
+
+Example:
+```bash
+# Clear custom storage path for work profile
+$ crumb --profile work storage clear
+Storage path cleared for profile: work (using default)
+
+# Verify it's using default path
+$ crumb --profile work storage get
+Storage: /Users/username/.config/crumb/secrets (profile: work)
+```
+
+## Profile Management
+
+### Multiple Profiles
+
+You can maintain separate secret stores for different contexts (work, personal, projects):
+
+```bash
+# Set up different profiles
+crumb --profile work setup
+crumb --profile personal setup
+crumb --profile project-x setup
+
+# Add secrets to different profiles
+crumb --profile work set /api/key "work-secret"
+crumb --profile personal set /github/token "personal-token"
+crumb --profile project-x set /db/password "project-password"
+
+# List secrets by profile
+crumb --profile work ls
+crumb --profile personal ls
+crumb --profile project-x ls
+```
+
+### Using Environment Variables
+
+```bash
+# Set default profile via environment variable
+export CRUMB_PROFILE=work
+crumb ls  # Lists work profile secrets
+
+# Override storage path temporarily
+export CRUMB_STORAGE=~/temp-secrets
+crumb set /temp/key "temporary value"
+```
+
+### Command-line Overrides
+
+```bash
+# Use a specific profile for one command
+crumb --profile work get /api/key
+
+# Override storage path for one command
+crumb --storage ~/backup-secrets ls
+
+# Combine profile and storage overrides
+crumb --profile work --storage ~/work-backup get /api/key
+```
+
+## Practical Examples
+
+### Work and Personal Separation
+
+```bash
+# Set up work profile with company SSH keys
+crumb --profile work setup
+# Enter work SSH key paths when prompted
+
+# Set up personal profile with personal SSH keys
+crumb --profile personal setup
+# Enter personal SSH key paths when prompted
+
+# Add work secrets
+crumb --profile work set /company/api-key "work-secret-123"
+crumb --profile work set /company/db-password "work-db-pass"
+
+# Add personal secrets
+crumb --profile personal set /github/token "ghp_personal123"
+crumb --profile personal set /aws/access-key "personal-aws-key"
+
+# List work secrets only
+crumb --profile work ls
+
+# List personal secrets only
+crumb --profile personal ls
+
+# Use environment variable for default profile
+export CRUMB_PROFILE=work
+crumb get /company/api-key  # Uses work profile
+```
+
+### Project-Specific Storage
+
+```bash
+# Create a project-specific storage location
+crumb --profile project-alpha setup
+crumb --profile project-alpha storage set ~/projects/alpha/secrets
+
+# Add project secrets
+crumb --profile project-alpha set /alpha/api-key "alpha-secret"
+crumb --profile project-alpha set /alpha/db-url "postgres://alpha-db"
+
+# Create project config for easy exporting
+cd ~/projects/alpha
+crumb init
+
+# Edit .crumb.yaml to reference project secrets
+cat > .crumb.yaml << EOF
+version: "1.0"
+path_sync:
+  path: "/alpha"
+  remap:
+    API_KEY: "ALPHA_API_KEY"
+    DB_URL: "ALPHA_DATABASE_URL"
+EOF
+
+# Export project environment variables
+CRUMB_PROFILE=project-alpha crumb export
+```
+
+### Backup and Migration
+
+```bash
+# Create a backup of work secrets to a different location
+crumb --profile work --storage ~/backups/work-secrets-backup ls
+# This will show empty since backup doesn't exist yet
+
+# Copy secrets by exporting and re-importing (manual process)
+crumb --profile work ls  # Note the keys you want to backup
+
+# Temporarily use backup storage to set up new secrets
+crumb --profile work --storage ~/backups/work-secrets-backup set /api/key "$(crumb --profile work get --show /api/key | cut -d= -f2)"
+
+# Switch work profile to use backup storage permanently
+crumb --profile work storage set ~/backups/work-secrets-backup
+```
+
 ### Export Command
 
 The `export` command exports secrets as shell-compatible environment variable assignments based on the `.crumb.yaml` config file.
 
 ```bash
-crumb export [--shell=bash|fish] [-f config-file]
+crumb export [--shell=bash|fish] [-f config-file] [--profile <profile-name>]
 ```
 
 This command:
+- Uses the specified profile (or default) for accessing secrets
 - Reads the `.crumb.yaml` configuration file from the current directory (or a custom path with `-f`)
 - Validates the YAML structure and paths
-- Decrypts the secrets file using the private key
+- Decrypts the secrets file using the profile's private key and storage location
 - Processes the `path_sync` section to export secrets matching a path prefix
 - Processes the `env` section to export individual secrets
 - Applies remapping from the `remap` section
@@ -358,16 +579,40 @@ $ crumb export --file my-project.yaml --shell=fish
 # Exported from /prod/my-project
 set -x MY_SECRET value123
 
+# Export from work profile
+$ crumb --profile work export
+# Exported from /prod/billing-svc
+export WORK_API_KEY=work-secret
+export WORK_DB_URL=postgres://work-db
+
+# Use environment variable for profile
+$ CRUMB_PROFILE=work crumb export --shell=fish
+# Exported from /prod/billing-svc
+set -x WORK_API_KEY work-secret
+set -x WORK_DB_URL postgres://work-db
+
 # Source the output directly
 $ source <(crumb export)
 $ echo $MG_KEY
 mgsecret
+
+# Source work profile secrets
+$ source <(crumb --profile work export)
+$ echo $WORK_API_KEY
+work-secret
 ```
 
 #### Local shell population
 
 ```bash
-`eval "$(crumb export)"`
+# Default profile
+eval "$(crumb export)"
+
+# Work profile
+eval "$(CRUMB_PROFILE=work crumb export)"
+
+# Specific profile and config
+eval "$(crumb --profile project-x export -f project-config.yaml)"
 ```
 
 ## Security Features
@@ -380,10 +625,68 @@ mgsecret
 
 ## Configuration
 
-The tool creates two configuration files:
+The tool creates configuration files to manage multiple profiles and their storage locations:
 
-1. `~/.config/crumb/config.yaml` - Stores SSH key paths
-2. `~/.config/crumb/secrets` - Encrypted key-value store
+### Main Configuration File
+
+`~/.config/crumb/config.yaml` - Stores profile configurations with SSH key paths and storage locations.
+
+**Multi-profile structure:**
+```yaml
+profiles:
+  default:
+    public_key_path: ~/.ssh/id_ed25519.pub
+    private_key_path: ~/.ssh/id_ed25519
+    storage: ~/.config/crumb/secrets
+  work:
+    public_key_path: ~/.ssh/work.pub
+    private_key_path: ~/.ssh/work
+    storage: ~/.config/crumb/work-secrets
+  personal:
+    public_key_path: ~/.ssh/personal.pub
+    private_key_path: ~/.ssh/personal
+    storage: ~/personal-secrets
+```
+
+### Storage Files
+
+Each profile has its own encrypted storage file:
+- Default profile: `~/.config/crumb/secrets` (unless customized)
+- Named profiles: Configurable per profile (e.g., `~/.config/crumb/work-secrets`)
+
+### Project Configuration
+
+`.crumb.yaml` - Per-project configuration for exporting secrets to environment variables.
+
+```yaml
+version: "1.0"
+path_sync:
+  path: "/prod/my-service"
+  remap:
+    API_KEY: "SERVICE_API_KEY"
+env:
+  DATABASE_URL:
+    path: "/prod/my-service/db/url"
+```
+
+## Migration from Legacy Configuration
+
+If you have an existing configuration file with the old format:
+
+```yaml
+public_key_path: ~/.ssh/id_ed25519.pub
+private_key_path: ~/.ssh/id_ed25519
+```
+
+You need to migrate it to the new profile-based format. Run `crumb setup` to create a new profile-based configuration, or manually update your `~/.config/crumb/config.yaml` to:
+
+```yaml
+profiles:
+  default:
+    public_key_path: ~/.ssh/id_ed25519.pub
+    private_key_path: ~/.ssh/id_ed25519
+    storage: ~/.config/crumb/secrets
+```
 
 
 ## Development

@@ -556,9 +556,9 @@ env:
 
 	// Test secrets map
 	secrets := map[string]string{
-		"/test/client-id":   "test-client-123",
-		"/test/api-key":     "secret-api-key",
-		"/test/db-url":      "postgresql://localhost:5432/test",
+		"/test/client-id": "test-client-123",
+		"/test/api-key":   "secret-api-key",
+		"/test/db-url":    "postgresql://localhost:5432/test",
 	}
 
 	// Simulate the export logic for environment variable sanitization
@@ -597,7 +597,7 @@ env:
 	// Verify that dashes were converted to underscores
 	expectedVars := map[string]string{
 		"CLIENT_ID":    "test-client-123",
-		"API_KEY":      "secret-api-key", 
+		"API_KEY":      "secret-api-key",
 		"DATABASE_URL": "postgresql://localhost:5432/test",
 		"DB_URL":       "postgresql://localhost:5432/test",
 	}

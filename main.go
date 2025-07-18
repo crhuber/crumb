@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -27,8 +28,14 @@ var (
 
 // Config represents the configuration stored in ~/.config/crumb/config.yaml
 type Config struct {
+	Profiles map[string]ProfileConfig `yaml:"profiles"`
+}
+
+// ProfileConfig represents a single profile configuration
+type ProfileConfig struct {
 	PublicKeyPath  string `yaml:"public_key_path"`
 	PrivateKeyPath string `yaml:"private_key_path"`
+	Storage        string `yaml:"storage,omitempty"`
 }
 
 // CrumbConfig represents the per-project configuration in .crumb.yaml
@@ -55,6 +62,19 @@ func main() {
 		Name:    "crumb",
 		Usage:   "Securely store, manage, and export API keys and secrets",
 		Version: version,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "profile",
+				Usage:   "Profile to use for configuration",
+				Value:   "default",
+				EnvVars: []string{"CRUMB_PROFILE"},
+			},
+			&cli.StringFlag{
+				Name:    "storage",
+				Usage:   "Storage file path",
+				EnvVars: []string{"CRUMB_STORAGE"},
+			},
+		},
 		Commands: []*cli.Command{
 			{
 				Name:   "setup",
@@ -114,6 +134,28 @@ func main() {
 				},
 				Action: exportCommand,
 			},
+			{
+				Name:  "storage",
+				Usage: "Manage storage file configuration",
+				Subcommands: []*cli.Command{
+					{
+						Name:      "set",
+						Usage:     "Set storage file path for current profile",
+						ArgsUsage: "<path>",
+						Action:    storageSetCommand,
+					},
+					{
+						Name:   "get",
+						Usage:  "Show current storage file path for current profile",
+						Action: storageGetCommand,
+					},
+					{
+						Name:   "clear",
+						Usage:  "Clear storage file path for current profile (use default)",
+						Action: storageClearCommand,
+					},
+				},
+			},
 		},
 	}
 
@@ -123,7 +165,9 @@ func main() {
 	}
 }
 
-func setupCommand(_ *cli.Context) error {
+func setupCommand(c *cli.Context) error {
+	profile := getProfile(c)
+
 	// Create ~/.config/crumb directory if it doesn't exist
 	configDir := filepath.Join(os.Getenv("HOME"), ".config", "crumb")
 	if err := os.MkdirAll(configDir, 0700); err != nil {
@@ -131,30 +175,23 @@ func setupCommand(_ *cli.Context) error {
 	}
 
 	configPath := filepath.Join(configDir, "config.yaml")
-	secretsPath := filepath.Join(configDir, "secrets")
-
-	// Check if files already exist and prompt for confirmation
-	if _, err := os.Stat(configPath); err == nil {
-		if !confirmOverwrite(fmt.Sprintf("Config file %s", configPath)) {
-			fmt.Println("Setup cancelled.")
-			return nil
-		}
-	}
-
-	if _, err := os.Stat(secretsPath); err == nil {
-		if !confirmOverwrite(fmt.Sprintf("Secrets file %s", secretsPath)) {
-			fmt.Println("Setup cancelled.")
-			return nil
-		}
-	}
 
 	// Prompt for SSH key paths
-	publicKeyPath, err := promptForKeyPath("Enter path to SSH public key (e.g., ~/.ssh/id_ed25519.pub): ")
+	var defaultPublicKey, defaultPrivateKey string
+	if profile == "default" {
+		defaultPublicKey = "~/.ssh/id_ed25519.pub"
+		defaultPrivateKey = "~/.ssh/id_ed25519"
+	} else {
+		defaultPublicKey = fmt.Sprintf("~/.ssh/%s.pub", profile)
+		defaultPrivateKey = fmt.Sprintf("~/.ssh/%s", profile)
+	}
+
+	publicKeyPath, err := promptForKeyPath(fmt.Sprintf("Enter path to SSH public key (e.g., %s): ", defaultPublicKey))
 	if err != nil {
 		return err
 	}
 
-	privateKeyPath, err := promptForKeyPath("Enter path to SSH private key (e.g., ~/.ssh/id_ed25519): ")
+	privateKeyPath, err := promptForKeyPath(fmt.Sprintf("Enter path to SSH private key (e.g., %s): ", defaultPrivateKey))
 	if err != nil {
 		return err
 	}
@@ -168,29 +205,76 @@ func setupCommand(_ *cli.Context) error {
 		return fmt.Errorf("invalid or missing SSH key pair. Please generate an SSH key pair using `ssh-keygen -t rsa` or `ssh-keygen -t ed25519` first: %w", err)
 	}
 
-	// Create config.yaml
-	config := Config{
-		PublicKeyPath:  publicKeyPath,
-		PrivateKeyPath: privateKeyPath,
+	// Get storage path (from CLI flag or prompt if not provided)
+	storagePath := c.String("storage")
+	if storagePath == "" {
+		if profile == "default" {
+			storagePath = filepath.Join(os.Getenv("HOME"), ".config", "crumb", "secrets")
+		} else {
+			defaultStorage := fmt.Sprintf("~/.config/crumb/secrets-%s", profile)
+			storagePath, err = promptForKeyPath(fmt.Sprintf("Enter storage file path (e.g., %s): ", defaultStorage))
+			if err != nil {
+				return err
+			}
+			// Use default if empty
+			if strings.TrimSpace(storagePath) == "" {
+				storagePath = defaultStorage
+			}
+		}
+	}
+	storagePath = expandTilde(storagePath)
+
+	// Create storage directory if it doesn't exist
+	storageDir := filepath.Dir(storagePath)
+	if err := os.MkdirAll(storageDir, 0700); err != nil {
+		return fmt.Errorf("failed to create storage directory: %w", err)
 	}
 
-	configData, err := yaml.Marshal(config)
+	// Load existing config or create new one
+	var config Config
+	if _, err := os.Stat(configPath); err == nil {
+		configData, err := os.ReadFile(configPath)
+		if err == nil {
+			yaml.Unmarshal(configData, &config)
+		}
+	}
+
+	// Initialize profiles map if it doesn't exist
+	if config.Profiles == nil {
+		config.Profiles = make(map[string]ProfileConfig)
+	}
+
+	// Create profile configuration
+	profileConfig := ProfileConfig{
+		PublicKeyPath:  publicKeyPath,
+		PrivateKeyPath: privateKeyPath,
+		Storage:        storagePath,
+	}
+
+	config.Profiles[profile] = profileConfig
+
+	// Save config
+	var buf bytes.Buffer
+	encoder := yaml.NewEncoder(&buf)
+	encoder.SetIndent(2)
+	err = encoder.Encode(&config)
+	encoder.Close()
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, configData, 0600); err != nil {
+	if err := os.WriteFile(configPath, buf.Bytes(), 0600); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
 	// Create empty encrypted secrets file
-	if err := createEmptySecretsFile(secretsPath, publicKeyPath); err != nil {
+	if err := createEmptySecretsFile(storagePath, publicKeyPath); err != nil {
 		return fmt.Errorf("failed to create secrets file: %w", err)
 	}
 
-	fmt.Printf("Setup completed successfully!\n")
+	fmt.Printf("Setup completed successfully for profile '%s'!\n", profile)
 	fmt.Printf("Config file: %s\n", configPath)
-	fmt.Printf("Secrets file: %s\n", secretsPath)
+	fmt.Printf("Storage file: %s\n", storagePath)
 
 	return nil
 }
@@ -371,7 +455,7 @@ func validateKeyPath(keyPath string) error {
 	return nil
 }
 
-func loadConfig() (*Config, error) {
+func loadConfig(profile string) (*ProfileConfig, error) {
 	configPath := filepath.Join(os.Getenv("HOME"), ".config", "crumb", "config.yaml")
 
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
@@ -388,13 +472,37 @@ func loadConfig() (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
-	return &config, nil
+	// Check for profile
+	if config.Profiles != nil {
+		if profileConfig, exists := config.Profiles[profile]; exists {
+			return &profileConfig, nil
+		}
+	}
+
+	return nil, fmt.Errorf("profile '%s' not found. Run 'crumb setup --profile %s' first", profile, profile)
 }
 
-func loadSecrets(privateKeyPath string) (map[string]string, error) {
-	secretsPath := filepath.Join(os.Getenv("HOME"), ".config", "crumb", "secrets")
+// Helper functions for profile management
+func getProfile(c *cli.Context) string {
+	return c.String("profile")
+}
 
-	if _, err := os.Stat(secretsPath); os.IsNotExist(err) {
+func getStoragePath(c *cli.Context, profile *ProfileConfig) string {
+	// Priority: CLI flag > profile storage > default
+	if storageFlag := c.String("storage"); storageFlag != "" {
+		return expandTilde(storageFlag)
+	}
+
+	if profile.Storage != "" {
+		return expandTilde(profile.Storage)
+	}
+
+	// Default storage path
+	return filepath.Join(os.Getenv("HOME"), ".config", "crumb", "secrets")
+}
+
+func loadSecrets(privateKeyPath, storagePath string) (map[string]string, error) {
+	if _, err := os.Stat(storagePath); os.IsNotExist(err) {
 		return make(map[string]string), nil
 	}
 
@@ -411,7 +519,7 @@ func loadSecrets(privateKeyPath string) (map[string]string, error) {
 	}
 
 	// Read and decrypt secrets file
-	encryptedData, err := readFileWithLock(secretsPath)
+	encryptedData, err := readFileWithLock(storagePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read secrets file: %w", err)
 	}
@@ -448,9 +556,7 @@ func loadSecrets(privateKeyPath string) (map[string]string, error) {
 	return secrets, nil
 }
 
-func saveSecrets(secrets map[string]string, publicKeyPath string) error {
-	secretsPath := filepath.Join(os.Getenv("HOME"), ".config", "crumb", "secrets")
-
+func saveSecrets(secrets map[string]string, publicKeyPath, storagePath string) error {
 	// Read public key
 	publicKeyData, err := os.ReadFile(publicKeyPath)
 	if err != nil {
@@ -480,7 +586,7 @@ func saveSecrets(secrets map[string]string, publicKeyPath string) error {
 	}
 
 	// Write encrypted file with locking
-	return writeFileWithLock(secretsPath, encryptedData, 0600)
+	return writeFileWithLock(storagePath, encryptedData, 0600)
 }
 
 func readFileWithLock(filePath string) ([]byte, error) {
@@ -547,13 +653,17 @@ func listCommand(c *cli.Context) error {
 	}
 
 	// Load configuration
-	config, err := loadConfig()
+	profile := getProfile(c)
+	config, err := loadConfig(profile)
 	if err != nil {
 		return err
 	}
 
+	// Get storage path
+	storagePath := getStoragePath(c, config)
+
 	// Load and decrypt secrets
-	secrets, err := loadSecrets(config.PrivateKeyPath)
+	secrets, err := loadSecrets(config.PrivateKeyPath, storagePath)
 	if err != nil {
 		return err
 	}
@@ -599,13 +709,17 @@ func setCommand(c *cli.Context) error {
 	}
 
 	// Load configuration
-	config, err := loadConfig()
+	profile := getProfile(c)
+	config, err := loadConfig(profile)
 	if err != nil {
 		return err
 	}
 
+	// Get storage path
+	storagePath := getStoragePath(c, config)
+
 	// Load and decrypt secrets
-	secrets, err := loadSecrets(config.PrivateKeyPath)
+	secrets, err := loadSecrets(config.PrivateKeyPath, storagePath)
 	if err != nil {
 		return err
 	}
@@ -623,7 +737,7 @@ func setCommand(c *cli.Context) error {
 	secrets[keyPath] = value
 
 	// Save encrypted secrets
-	if err := saveSecrets(secrets, config.PublicKeyPath); err != nil {
+	if err := saveSecrets(secrets, config.PublicKeyPath, storagePath); err != nil {
 		return err
 	}
 
@@ -652,14 +766,17 @@ func initCommand(_ *cli.Context) error {
 		Env: make(map[string]EnvConfig),
 	}
 
-	// Marshal to YAML
-	yamlData, err := yaml.Marshal(defaultConfig)
-	if err != nil {
+	// Marshal to YAML with 2-space indentation
+	var buf bytes.Buffer
+	encoder := yaml.NewEncoder(&buf)
+	encoder.SetIndent(2)
+	if err := encoder.Encode(&defaultConfig); err != nil {
 		return fmt.Errorf("failed to marshal default config: %w", err)
 	}
+	encoder.Close()
 
 	// Write to file
-	if err := os.WriteFile(configFileName, yamlData, 0600); err != nil {
+	if err := os.WriteFile(configFileName, buf.Bytes(), 0600); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
@@ -681,13 +798,17 @@ func deleteCommand(c *cli.Context) error {
 	}
 
 	// Load configuration
-	config, err := loadConfig()
+	profile := getProfile(c)
+	config, err := loadConfig(profile)
 	if err != nil {
 		return err
 	}
 
+	// Get storage path
+	storagePath := getStoragePath(c, config)
+
 	// Load and decrypt secrets
-	secrets, err := loadSecrets(config.PrivateKeyPath)
+	secrets, err := loadSecrets(config.PrivateKeyPath, storagePath)
 	if err != nil {
 		return err
 	}
@@ -716,7 +837,7 @@ func deleteCommand(c *cli.Context) error {
 	delete(secrets, keyPath)
 
 	// Save encrypted secrets
-	if err := saveSecrets(secrets, config.PublicKeyPath); err != nil {
+	if err := saveSecrets(secrets, config.PublicKeyPath, storagePath); err != nil {
 		return err
 	}
 
@@ -741,13 +862,17 @@ func exportCommand(c *cli.Context) error {
 	}
 
 	// Load application configuration
-	config, err := loadConfig()
+	profile := getProfile(c)
+	config, err := loadConfig(profile)
 	if err != nil {
 		return err
 	}
 
+	// Get storage path
+	storagePath := getStoragePath(c, config)
+
 	// Load and decrypt secrets
-	secrets, err := loadSecrets(config.PrivateKeyPath)
+	secrets, err := loadSecrets(config.PrivateKeyPath, storagePath)
 	if err != nil {
 		return err
 	}
@@ -797,7 +922,7 @@ func exportCommand(c *cli.Context) error {
 		// Sanitize both original and new key names
 		sanitizedOriginalKey := strings.ToUpper(strings.ReplaceAll(originalKey, "-", "_"))
 		sanitizedNewKey := strings.ToUpper(strings.ReplaceAll(newKey, "-", "_"))
-		
+
 		if value, exists := envVars[sanitizedOriginalKey]; exists {
 			envVars[sanitizedNewKey] = value
 			delete(envVars, sanitizedOriginalKey)
@@ -845,13 +970,17 @@ func getCommand(c *cli.Context) error {
 	}
 
 	// Load configuration
-	config, err := loadConfig()
+	profile := getProfile(c)
+	config, err := loadConfig(profile)
 	if err != nil {
 		return err
 	}
 
+	// Get storage path
+	storagePath := getStoragePath(c, config)
+
 	// Load and decrypt secrets
-	secrets, err := loadSecrets(config.PrivateKeyPath)
+	secrets, err := loadSecrets(config.PrivateKeyPath, storagePath)
 	if err != nil {
 		return err
 	}
@@ -947,4 +1076,119 @@ func loadCrumbConfig(configFileName string) (*CrumbConfig, error) {
 	}
 
 	return &config, nil
+}
+
+// Storage management commands
+func storageSetCommand(c *cli.Context) error {
+	if c.Args().Len() != 1 {
+		return fmt.Errorf("usage: crumb storage set <path>")
+	}
+
+	storagePath := c.Args().Get(0)
+	profile := getProfile(c)
+
+	// Load or create config
+	configDir := filepath.Join(os.Getenv("HOME"), ".config", "crumb")
+	configPath := filepath.Join(configDir, "config.yaml")
+
+	var config Config
+	if _, err := os.Stat(configPath); err == nil {
+		configData, err := os.ReadFile(configPath)
+		if err == nil {
+			yaml.Unmarshal(configData, &config)
+		}
+	}
+
+	// Initialize profiles map if needed
+	if config.Profiles == nil {
+		config.Profiles = make(map[string]ProfileConfig)
+	}
+
+	// Get existing profile config or create new one
+	profileConfig := config.Profiles[profile]
+	if profileConfig.PublicKeyPath == "" {
+		return fmt.Errorf("profile '%s' not found. Run 'crumb setup --profile %s' first", profile, profile)
+	}
+
+	// Update storage path
+	profileConfig.Storage = expandTilde(storagePath)
+	config.Profiles[profile] = profileConfig
+
+	// Save config
+	var buf bytes.Buffer
+	encoder := yaml.NewEncoder(&buf)
+	encoder.SetIndent(2)
+	if err := encoder.Encode(&config); err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+	encoder.Close()
+
+	// Create config directory if needed
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, buf.Bytes(), 0600); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	fmt.Printf("Storage path set to: %s (profile: %s)\n", profileConfig.Storage, profile)
+	return nil
+}
+
+func storageGetCommand(c *cli.Context) error {
+	profile := getProfile(c)
+	config, err := loadConfig(profile)
+	if err != nil {
+		return err
+	}
+
+	storagePath := getStoragePath(c, config)
+	fmt.Printf("Storage: %s (profile: %s)\n", storagePath, profile)
+	return nil
+}
+
+func storageClearCommand(c *cli.Context) error {
+	profile := getProfile(c)
+
+	// Load config
+	configDir := filepath.Join(os.Getenv("HOME"), ".config", "crumb")
+	configPath := filepath.Join(configDir, "config.yaml")
+
+	var config Config
+	if _, err := os.Stat(configPath); err != nil {
+		return fmt.Errorf("config file not found")
+	}
+
+	configData, err := os.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to read config: %w", err)
+	}
+
+	if err := yaml.Unmarshal(configData, &config); err != nil {
+		return fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	// Clear storage for the profile
+	if config.Profiles != nil && config.Profiles[profile].PublicKeyPath != "" {
+		profileConfig := config.Profiles[profile]
+		profileConfig.Storage = ""
+		config.Profiles[profile] = profileConfig
+	}
+
+	// Save config
+	var buf bytes.Buffer
+	encoder := yaml.NewEncoder(&buf)
+	encoder.SetIndent(2)
+	if err := encoder.Encode(&config); err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+	encoder.Close()
+
+	if err := os.WriteFile(configPath, buf.Bytes(), 0600); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	fmt.Printf("Storage path cleared for profile: %s (using default)\n", profile)
+	return nil
 }
