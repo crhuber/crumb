@@ -175,7 +175,7 @@ func main() {
 	}
 }
 
-func setupCommand(ctx context.Context, cmd *cli.Command) error {
+func setupCommand(_ context.Context, cmd *cli.Command) error {
 	profile := getProfile(cmd)
 
 	// Create ~/.config/crumb directory if it doesn't exist
@@ -655,7 +655,7 @@ func parseSecrets(content string) map[string]string {
 }
 
 // Placeholder functions for other commands
-func listCommand(ctx context.Context, cmd *cli.Command) error {
+func listCommand(_ context.Context, cmd *cli.Command) error {
 	// Get optional path filter argument
 	pathFilter := ""
 	if cmd.Args().Len() > 0 {
@@ -704,7 +704,7 @@ func listCommand(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-func setCommand(ctx context.Context, cmd *cli.Command) error {
+func setCommand(_ context.Context, cmd *cli.Command) error {
 	// Check arguments
 	if cmd.Args().Len() != 2 {
 		return fmt.Errorf("usage: crumb set <key-path> <value>")
@@ -755,7 +755,7 @@ func setCommand(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-func initCommand(ctx context.Context, cmd *cli.Command) error {
+func initCommand(_ context.Context, cmd *cli.Command) error {
 	configFileName := ".crumb.yaml"
 
 	// Check if .crumb.yaml already exists
@@ -794,7 +794,7 @@ func initCommand(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-func deleteCommand(ctx context.Context, cmd *cli.Command) error {
+func deleteCommand(_ context.Context, cmd *cli.Command) error {
 	// Check arguments
 	if cmd.Args().Len() != 1 {
 		return fmt.Errorf("usage: crumb delete <key-path>")
@@ -855,7 +855,7 @@ func deleteCommand(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-func exportCommand(ctx context.Context, cmd *cli.Command) error {
+func exportCommand(_ context.Context, cmd *cli.Command) error {
 	// Get shell format (default to bash)
 	shell := cmd.String("shell")
 	if shell == "" {
@@ -965,7 +965,7 @@ func exportCommand(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-func getCommand(ctx context.Context, cmd *cli.Command) error {
+func getCommand(_ context.Context, cmd *cli.Command) error {
 	// Check arguments
 	if cmd.Args().Len() != 1 {
 		return fmt.Errorf("usage: crumb get <key-path>")
@@ -1123,7 +1123,7 @@ func loadCrumbConfig(configFileName string) (*CrumbConfig, error) {
 }
 
 // Storage management commands
-func storageSetCommand(ctx context.Context, cmd *cli.Command) error {
+func storageSetCommand(_ context.Context, cmd *cli.Command) error {
 	if cmd.Args().Len() != 1 {
 		return fmt.Errorf("usage: crumb storage set <path>")
 	}
@@ -1180,7 +1180,7 @@ func storageSetCommand(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-func storageGetCommand(ctx context.Context, cmd *cli.Command) error {
+func storageGetCommand(_ context.Context, cmd *cli.Command) error {
 	profile := getProfile(cmd)
 	config, err := loadConfig(profile)
 	if err != nil {
@@ -1192,7 +1192,7 @@ func storageGetCommand(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-func storageClearCommand(ctx context.Context, cmd *cli.Command) error {
+func storageClearCommand(_ context.Context, cmd *cli.Command) error {
 	profile := getProfile(cmd)
 
 	// Load config
