@@ -194,23 +194,24 @@ $ crumb get /prod/api_key
 ****
 
 # Get a secret with actual value
-$ crumb get --show /prod/api_key
+$ crumb get /prod/api_key --show
 secret123
 
 # Export a secret for bash sourcing
-$ crumb get --export /prod/api_key
+$ crumb get /prod/api_key --export
 export PROD_API_KEY=secret123
 
 # Export a secret for fish shell
-$ crumb get --export --shell fish /prod/api_key
+$ crumb get /prod/api_key --export --shell fish
 set -x PROD_API_KEY secret123
 
+
 # Export with complex key path
-$ crumb get --export /api/my-service/auth-token
+$ crumb get /api/my-service/auth-token --export
 export API_MY_SERVICE_AUTH_TOKEN=token123
 
 # Source the export directly in bash
-$ eval "$(crumb get --export /prod/api_key)"
+$ eval "$(crumb get /prod/api_key --export)"
 $ echo $PROD_API_KEY
 secret123
 
@@ -225,10 +226,6 @@ Error: key path must start with '/'
 $ crumb get "/test/key with spaces"
 Error: key path cannot contain spaces
 
-# Unsupported shell format
-$ crumb get --export --shell zsh /prod/api_key
-Error: unsupported shell format: zsh (supported: bash, fish)
-```
 
 #### Variable Name Conversion
 
@@ -251,14 +248,14 @@ The `--export` flag makes it easy to integrate secrets into shell scripts and wo
 **Bash:**
 ```bash
 # Source a single secret
-eval "$(crumb get --export /api/key)"
+eval "$(crumb get /api/key --export)"
 echo "API Key: $API_KEY"
 
 # Source multiple secrets in a script
 #!/bin/bash
-eval "$(crumb get --export /prod/database-url)"
-eval "$(crumb get --export /prod/api-key)"
-eval "$(crumb get --export /prod/stripe-secret)"
+eval "$(crumb get /prod/database-url --export)"
+eval "$(crumb get /prod/api-key --export)"
+eval "$(crumb get /prod/stripe-secret --export)"
 
 # Now use the environment variables
 psql "$PROD_DATABASE_URL" -c "SELECT COUNT(*) FROM users;"
@@ -268,12 +265,12 @@ curl -H "Authorization: Bearer $PROD_API_KEY" https://api.example.com/
 **Fish:**
 ```fish
 # Source a single secret
-eval (crumb get --export --shell fish /api/key)
+eval (crumb get /api/key --export --shell fish)
 echo "API Key: $API_KEY"
 
 # Source multiple secrets
-eval (crumb get --export --shell fish /prod/database-url)
-eval (crumb get --export --shell fish /prod/api-key)
+eval (crumb get /prod/database-url --export --shell fish)
+eval (crumb get /prod/api-key --export --shell fish)
 ```
 
 ### Init Command
@@ -593,7 +590,7 @@ crumb --profile work storage set ~/backups/work-secrets-backup
 The `export` command exports secrets as shell-compatible environment variable assignments based on the `.crumb.yaml` config file.
 
 ```bash
-crumb export [--shell=bash|fish] [-f config-file] [--profile <profile-name>]
+crumb export [-f config-file] [--shell=bash|fish] [--profile <profile-name>]
 ```
 
 This command:
@@ -638,7 +635,7 @@ export MG_KEY=mgsecret
 export STRIPE_KEY=stripesecret
 
 # Export for fish shell
-$ crumb export --shell=fish
+$ crumb export --shell fish
 # Exported from /prod/billing-svc
 set -x API_SECRET secret123
 set -x DATABASE_URL postgres://user:pass@localhost/db
@@ -650,13 +647,13 @@ $ crumb export -f my-project.yaml
 # Exported from /prod/my-project
 export MY_SECRET=value123
 
-# Use custom config file with long flag
-$ crumb export --file my-project.yaml --shell=fish
+# Use custom config file
+$ crumb export --file my-project.yaml --shell fish
 # Exported from /prod/my-project
 set -x MY_SECRET value123
 
 # Export from work profile
-$ crumb --profile work export
+$ crumb export --profile work
 # Exported from /prod/billing-svc
 export WORK_API_KEY=work-secret
 export WORK_DB_URL=postgres://work-db

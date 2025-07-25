@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -13,7 +14,7 @@ import (
 
 	"filippo.io/age"
 	"filippo.io/age/agessh"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"golang.org/x/sys/unix"
 	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
@@ -55,10 +56,10 @@ type EnvConfig struct {
 }
 
 func main() {
-	cli.VersionPrinter = func(cCtx *cli.Context) {
-		fmt.Printf("version=%s commit=%s date=%s\n", cCtx.App.Version, commit, date)
+	cli.VersionPrinter = func(cmd *cli.Command) {
+		fmt.Printf("version=%s commit=%s date=%s\n", cmd.Root().Version, commit, date)
 	}
-	app := &cli.App{
+	cmd := &cli.Command{
 		Name:    "crumb",
 		Usage:   "Securely store, manage, and export API keys and secrets",
 		Version: version,
@@ -67,12 +68,12 @@ func main() {
 				Name:    "profile",
 				Usage:   "Profile to use for configuration",
 				Value:   "default",
-				EnvVars: []string{"CRUMB_PROFILE"},
+				Sources: cli.EnvVars("CRUMB_PROFILE"),
 			},
 			&cli.StringFlag{
 				Name:    "storage",
 				Usage:   "Storage file path",
-				EnvVars: []string{"CRUMB_STORAGE"},
+				Sources: cli.EnvVars("CRUMB_STORAGE"),
 			},
 		},
 		Commands: []*cli.Command{
@@ -146,7 +147,7 @@ func main() {
 			{
 				Name:  "storage",
 				Usage: "Manage storage file configuration",
-				Subcommands: []*cli.Command{
+				Commands: []*cli.Command{
 					{
 						Name:      "set",
 						Usage:     "Set storage file path for current profile",
@@ -168,14 +169,14 @@ func main() {
 		},
 	}
 
-	if err := app.Run(os.Args); err != nil {
+	if err := cmd.Run(context.Background(), os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func setupCommand(c *cli.Context) error {
-	profile := getProfile(c)
+func setupCommand(ctx context.Context, cmd *cli.Command) error {
+	profile := getProfile(cmd)
 
 	// Create ~/.config/crumb directory if it doesn't exist
 	configDir := filepath.Join(os.Getenv("HOME"), ".config", "crumb")
@@ -215,7 +216,7 @@ func setupCommand(c *cli.Context) error {
 	}
 
 	// Get storage path (from CLI flag or prompt if not provided)
-	storagePath := c.String("storage")
+	storagePath := cmd.String("storage")
 	if storagePath == "" {
 		if profile == "default" {
 			storagePath = filepath.Join(os.Getenv("HOME"), ".config", "crumb", "secrets")
@@ -492,13 +493,13 @@ func loadConfig(profile string) (*ProfileConfig, error) {
 }
 
 // Helper functions for profile management
-func getProfile(c *cli.Context) string {
-	return c.String("profile")
+func getProfile(cmd *cli.Command) string {
+	return cmd.String("profile")
 }
 
-func getStoragePath(c *cli.Context, profile *ProfileConfig) string {
+func getStoragePath(cmd *cli.Command, profile *ProfileConfig) string {
 	// Priority: CLI flag > profile storage > default
-	if storageFlag := c.String("storage"); storageFlag != "" {
+	if storageFlag := cmd.String("storage"); storageFlag != "" {
 		return expandTilde(storageFlag)
 	}
 
@@ -654,22 +655,22 @@ func parseSecrets(content string) map[string]string {
 }
 
 // Placeholder functions for other commands
-func listCommand(c *cli.Context) error {
+func listCommand(ctx context.Context, cmd *cli.Command) error {
 	// Get optional path filter argument
 	pathFilter := ""
-	if c.Args().Len() > 0 {
-		pathFilter = c.Args().Get(0)
+	if cmd.Args().Len() > 0 {
+		pathFilter = cmd.Args().Get(0)
 	}
 
 	// Load configuration
-	profile := getProfile(c)
+	profile := getProfile(cmd)
 	config, err := loadConfig(profile)
 	if err != nil {
 		return err
 	}
 
 	// Get storage path
-	storagePath := getStoragePath(c, config)
+	storagePath := getStoragePath(cmd, config)
 
 	// Load and decrypt secrets
 	secrets, err := loadSecrets(config.PrivateKeyPath, storagePath)
@@ -703,14 +704,14 @@ func listCommand(c *cli.Context) error {
 	return nil
 }
 
-func setCommand(c *cli.Context) error {
+func setCommand(ctx context.Context, cmd *cli.Command) error {
 	// Check arguments
-	if c.Args().Len() != 2 {
+	if cmd.Args().Len() != 2 {
 		return fmt.Errorf("usage: crumb set <key-path> <value>")
 	}
 
-	keyPath := c.Args().Get(0)
-	value := c.Args().Get(1)
+	keyPath := cmd.Args().Get(0)
+	value := cmd.Args().Get(1)
 
 	// Validate key path
 	if err := validateKeyPath(keyPath); err != nil {
@@ -718,14 +719,14 @@ func setCommand(c *cli.Context) error {
 	}
 
 	// Load configuration
-	profile := getProfile(c)
+	profile := getProfile(cmd)
 	config, err := loadConfig(profile)
 	if err != nil {
 		return err
 	}
 
 	// Get storage path
-	storagePath := getStoragePath(c, config)
+	storagePath := getStoragePath(cmd, config)
 
 	// Load and decrypt secrets
 	secrets, err := loadSecrets(config.PrivateKeyPath, storagePath)
@@ -754,7 +755,7 @@ func setCommand(c *cli.Context) error {
 	return nil
 }
 
-func initCommand(_ *cli.Context) error {
+func initCommand(ctx context.Context, cmd *cli.Command) error {
 	configFileName := ".crumb.yaml"
 
 	// Check if .crumb.yaml already exists
@@ -793,13 +794,13 @@ func initCommand(_ *cli.Context) error {
 	return nil
 }
 
-func deleteCommand(c *cli.Context) error {
+func deleteCommand(ctx context.Context, cmd *cli.Command) error {
 	// Check arguments
-	if c.Args().Len() != 1 {
+	if cmd.Args().Len() != 1 {
 		return fmt.Errorf("usage: crumb delete <key-path>")
 	}
 
-	keyPath := c.Args().Get(0)
+	keyPath := cmd.Args().Get(0)
 
 	// Validate key path
 	if err := validateKeyPath(keyPath); err != nil {
@@ -807,14 +808,14 @@ func deleteCommand(c *cli.Context) error {
 	}
 
 	// Load configuration
-	profile := getProfile(c)
+	profile := getProfile(cmd)
 	config, err := loadConfig(profile)
 	if err != nil {
 		return err
 	}
 
 	// Get storage path
-	storagePath := getStoragePath(c, config)
+	storagePath := getStoragePath(cmd, config)
 
 	// Load and decrypt secrets
 	secrets, err := loadSecrets(config.PrivateKeyPath, storagePath)
@@ -854,15 +855,15 @@ func deleteCommand(c *cli.Context) error {
 	return nil
 }
 
-func exportCommand(c *cli.Context) error {
+func exportCommand(ctx context.Context, cmd *cli.Command) error {
 	// Get shell format (default to bash)
-	shell := c.String("shell")
+	shell := cmd.String("shell")
 	if shell == "" {
 		shell = "bash"
 	}
 
 	// Get config file path from flag
-	configFile := c.String("file")
+	configFile := cmd.String("file")
 
 	// Load .crumb.yaml configuration
 	crumbConfig, err := loadCrumbConfig(configFile)
@@ -871,14 +872,14 @@ func exportCommand(c *cli.Context) error {
 	}
 
 	// Load application configuration
-	profile := getProfile(c)
+	profile := getProfile(cmd)
 	config, err := loadConfig(profile)
 	if err != nil {
 		return err
 	}
 
 	// Get storage path
-	storagePath := getStoragePath(c, config)
+	storagePath := getStoragePath(cmd, config)
 
 	// Load and decrypt secrets
 	secrets, err := loadSecrets(config.PrivateKeyPath, storagePath)
@@ -964,16 +965,16 @@ func exportCommand(c *cli.Context) error {
 	return nil
 }
 
-func getCommand(c *cli.Context) error {
+func getCommand(ctx context.Context, cmd *cli.Command) error {
 	// Check arguments
-	if c.Args().Len() != 1 {
+	if cmd.Args().Len() != 1 {
 		return fmt.Errorf("usage: crumb get <key-path>")
 	}
 
-	keyPath := c.Args().Get(0)
-	showValue := c.Bool("show")
-	exportFormat := c.Bool("export")
-	shell := c.String("shell")
+	keyPath := cmd.Args().Get(0)
+	showValue := cmd.Bool("show")
+	exportFormat := cmd.Bool("export")
+	shell := cmd.String("shell")
 
 	// Validate key path
 	if err := validateKeyPath(keyPath); err != nil {
@@ -981,14 +982,14 @@ func getCommand(c *cli.Context) error {
 	}
 
 	// Load configuration
-	profile := getProfile(c)
+	profile := getProfile(cmd)
 	config, err := loadConfig(profile)
 	if err != nil {
 		return err
 	}
 
 	// Get storage path
-	storagePath := getStoragePath(c, config)
+	storagePath := getStoragePath(cmd, config)
 
 	// Load and decrypt secrets
 	secrets, err := loadSecrets(config.PrivateKeyPath, storagePath)
@@ -1122,13 +1123,13 @@ func loadCrumbConfig(configFileName string) (*CrumbConfig, error) {
 }
 
 // Storage management commands
-func storageSetCommand(c *cli.Context) error {
-	if c.Args().Len() != 1 {
+func storageSetCommand(ctx context.Context, cmd *cli.Command) error {
+	if cmd.Args().Len() != 1 {
 		return fmt.Errorf("usage: crumb storage set <path>")
 	}
 
-	storagePath := c.Args().Get(0)
-	profile := getProfile(c)
+	storagePath := cmd.Args().Get(0)
+	profile := getProfile(cmd)
 
 	// Load or create config
 	configDir := filepath.Join(os.Getenv("HOME"), ".config", "crumb")
@@ -1179,20 +1180,20 @@ func storageSetCommand(c *cli.Context) error {
 	return nil
 }
 
-func storageGetCommand(c *cli.Context) error {
-	profile := getProfile(c)
+func storageGetCommand(ctx context.Context, cmd *cli.Command) error {
+	profile := getProfile(cmd)
 	config, err := loadConfig(profile)
 	if err != nil {
 		return err
 	}
 
-	storagePath := getStoragePath(c, config)
+	storagePath := getStoragePath(cmd, config)
 	fmt.Printf("Storage: %s (profile: %s)\n", storagePath, profile)
 	return nil
 }
 
-func storageClearCommand(c *cli.Context) error {
-	profile := getProfile(c)
+func storageClearCommand(ctx context.Context, cmd *cli.Command) error {
+	profile := getProfile(cmd)
 
 	// Load config
 	configDir := filepath.Join(os.Getenv("HOME"), ".config", "crumb")
