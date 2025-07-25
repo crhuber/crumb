@@ -755,7 +755,7 @@ func setCommand(_ context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-func initCommand(_ context.Context, cmd *cli.Command) error {
+func initCommand(_ context.Context, _ *cli.Command) error {
 	configFileName := ".crumb.yaml"
 
 	// Check if .crumb.yaml already exists
