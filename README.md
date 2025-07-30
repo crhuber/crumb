@@ -2,14 +2,27 @@
 
 `crumb` is a command line tool designed to securely store, manage, and export API keys and secrets for developers. It uses an encrypted plain text file as the backend, leveraging the `age` encryption library with SSH public/private key pairs for encryption and decryption.
 
+`crumb` is inspired by tools such as:
+
+- [Hashicorp Vault](https://www.hashicorp.com/en/products/vault)
+- [Teller](https://github.com/tellerops/teller)
+- [Gopass](https://github.com/gopasspw/gopass)
+- [Sops](https://github.com/getsops/sops)
+- [Direnv](https://direnv.net/)
+- [SecretSpec](https://devenv.sh/blog/2025/07/21/announcing-secretspec-declarative-secrets-management/)
+
+but, designed for the non-enterprise developer without access to a cloud Secrets Manager, raft storage, etc. Crumb was born out of the need to be able to switch secrets between different projects, without leaving project secrets unencrypted on disk.
+
 ## Installation
 
 1. Download and add binary to $PATH from https://github.com/crhuber/crumb/releases
 
-OR  use [kelp](https://github.com/crhuber/kelp)
+OR
+
+2. Use [kelp](https://github.com/crhuber/kelp)
 
 ```bash
-kelp add -i crhuber/crumb
+kelp add crhuber/crumb --install
 ```
 
 ## Features
@@ -773,3 +786,7 @@ This project uses [Task](https://taskfile.dev/) for build automation. Common tas
 - `task ci` - Run CI pipeline
 - `task clean` - Clean build artifacts
 - `task --list` - Show all available tasks
+
+
+## Contributing
+If you find bugs, please open an issue first.
