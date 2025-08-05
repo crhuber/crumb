@@ -600,13 +600,20 @@ crumb --profile work storage set ~/backups/work-secrets-backup
 
 ### Export Command
 
-The `export` command exports secrets as shell-compatible environment variable assignments based on the `.crumb.yaml` config file.
+The `export` command exports secrets as shell-compatible environment variable assignments. It supports two modes:
+
+1. **Config-based export**: Uses a `.crumb.yaml` configuration file (traditional mode)
+2. **Direct path export**: Exports all secrets from a specific path without requiring a config file (new!)
 
 ```bash
+# Config-based export
 crumb export [-f config-file] [--shell=bash|fish] [--profile <profile-name>]
+
+# Direct path export
+crumb export --path <secret-path> [--shell=bash|fish] [--profile <profile-name>]
 ```
 
-This command:
+**Config-based mode** (when no `--path` flag is provided):
 - Uses the specified profile (or default) for accessing secrets
 - Reads the `.crumb.yaml` configuration file from the current directory (or a custom path with `-f`)
 - Validates the YAML structure and paths
@@ -616,6 +623,12 @@ This command:
 - Applies remapping from the `remap` section
 - Outputs in Bash (`export VAR=value`) or Fish (`set -x VAR value`) format
 - Includes comments for clarity
+
+**Direct path mode** (when `--path` flag is provided):
+- Bypasses the need for a `.crumb.yaml` configuration file
+- Exports all secrets that start with the specified path prefix
+- Converts secret paths to environment variable names by removing the prefix and transforming to uppercase with underscores
+- Perfect for quick exports without setting up configuration files
 
 #### Example Usage
 
@@ -680,6 +693,38 @@ set -x WORK_DB_URL postgres://work-db
 # Source the output directly
 $ source <(crumb export)
 $ echo $MG_KEY
+mgsecret
+
+#### Direct Path Export Examples
+
+The `--path` flag allows you to export secrets directly without a `.crumb.yaml` file:
+
+```bash
+# Export all secrets from /api path
+$ crumb export --path /api
+# Exported from /api
+export CLIENT=foo
+export CLIENT_SECRET=bar
+
+# Export with fish shell format
+$ crumb export --path /api --shell fish
+# Exported from /api
+set -x CLIENT foo
+set -x CLIENT_SECRET bar
+
+# Use with different profile
+$ crumb export --path /prod/api --profile production
+# Exported from /prod/api
+export API_KEY=secret123
+export SERVICE_TOKEN=token456
+
+# Source directly into shell
+$ eval "$(crumb export --path /api)"
+```
+
+**Path to Variable Name Conversion**:
+- Only the final segment (actual secret name) is used, intermediate path segments are ignored
+- Hyphens in the secret name are converted to underscores, and the result is uppercase
 mgsecret
 
 # Source work profile secrets

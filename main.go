@@ -141,6 +141,10 @@ func main() {
 						Usage:   "Configuration file to use (default: .crumb.yaml)",
 						Value:   ".crumb.yaml",
 					},
+					&cli.StringFlag{
+						Name:  "path",
+						Usage: "Export all secrets from a specific path (bypasses .crumb.yaml)",
+					},
 				},
 				Action: exportCommand,
 			},
@@ -862,14 +866,8 @@ func exportCommand(_ context.Context, cmd *cli.Command) error {
 		shell = "bash"
 	}
 
-	// Get config file path from flag
-	configFile := cmd.String("file")
-
-	// Load .crumb.yaml configuration
-	crumbConfig, err := loadCrumbConfig(configFile)
-	if err != nil {
-		return err
-	}
+	// Check if --path flag is provided
+	pathFlag := cmd.String("path")
 
 	// Load application configuration
 	profile := getProfile(cmd)
@@ -890,10 +888,12 @@ func exportCommand(_ context.Context, cmd *cli.Command) error {
 	// Collect environment variables to export
 	envVars := make(map[string]string)
 
-	// Process path_sync section
-	if crumbConfig.PathSync.Path != "" {
+	if pathFlag != "" {
+		// Direct path export mode - export all secrets matching the path
+		pathPrefix := strings.TrimSuffix(pathFlag, "/")
+
 		// Add comment for clarity
-		comment := fmt.Sprintf("# Exported from %s", crumbConfig.PathSync.Path)
+		comment := fmt.Sprintf("# Exported from %s", pathPrefix)
 		switch shell {
 		case "bash":
 			fmt.Println(comment)
@@ -902,40 +902,81 @@ func exportCommand(_ context.Context, cmd *cli.Command) error {
 		}
 
 		// Find all secrets that match the path prefix
-		pathPrefix := strings.TrimSuffix(crumbConfig.PathSync.Path, "/")
 		for secretPath, secretValue := range secrets {
 			if strings.HasPrefix(secretPath, pathPrefix) {
-				// Extract the key name from the path
-				keyName := strings.TrimPrefix(secretPath, pathPrefix)
-				keyName = strings.TrimPrefix(keyName, "/")
-				keyName = strings.ToUpper(strings.ReplaceAll(keyName, "/", "_"))
-				keyName = strings.ReplaceAll(keyName, "-", "_")
+				// Extract just the final segment (actual secret name) from the path
+				remainingPath := strings.TrimPrefix(secretPath, pathPrefix)
+				remainingPath = strings.TrimPrefix(remainingPath, "/")
 
-				if keyName != "" {
-					envVars[keyName] = secretValue
+				// Get the last segment of the path (the actual secret name)
+				pathSegments := strings.Split(remainingPath, "/")
+				if len(pathSegments) > 0 {
+					keyName := pathSegments[len(pathSegments)-1]
+					keyName = strings.ToUpper(strings.ReplaceAll(keyName, "-", "_"))
+
+					if keyName != "" {
+						envVars[keyName] = secretValue
+					}
 				}
 			}
 		}
-	}
+	} else {
+		// .crumb.yaml mode - existing logic
+		configFile := cmd.String("file")
 
-	// Process env section
-	for envVarName, envConfig := range crumbConfig.Env {
-		if secretValue, exists := secrets[envConfig.Path]; exists {
-			// Sanitize environment variable name
-			sanitizedEnvVarName := strings.ToUpper(strings.ReplaceAll(envVarName, "-", "_"))
-			envVars[sanitizedEnvVarName] = secretValue
+		// Load .crumb.yaml configuration
+		crumbConfig, err := loadCrumbConfig(configFile)
+		if err != nil {
+			return err
 		}
-	}
 
-	// Apply remap mappings
-	for originalKey, newKey := range crumbConfig.PathSync.Remap {
-		// Sanitize both original and new key names
-		sanitizedOriginalKey := strings.ToUpper(strings.ReplaceAll(originalKey, "-", "_"))
-		sanitizedNewKey := strings.ToUpper(strings.ReplaceAll(newKey, "-", "_"))
+		// Process path_sync section
+		if crumbConfig.PathSync.Path != "" {
+			// Add comment for clarity
+			comment := fmt.Sprintf("# Exported from %s", crumbConfig.PathSync.Path)
+			switch shell {
+			case "bash":
+				fmt.Println(comment)
+			case "fish":
+				fmt.Println(comment)
+			}
 
-		if value, exists := envVars[sanitizedOriginalKey]; exists {
-			envVars[sanitizedNewKey] = value
-			delete(envVars, sanitizedOriginalKey)
+			// Find all secrets that match the path prefix
+			pathPrefix := strings.TrimSuffix(crumbConfig.PathSync.Path, "/")
+			for secretPath, secretValue := range secrets {
+				if strings.HasPrefix(secretPath, pathPrefix) {
+					// Extract the key name from the path
+					keyName := strings.TrimPrefix(secretPath, pathPrefix)
+					keyName = strings.TrimPrefix(keyName, "/")
+					keyName = strings.ToUpper(strings.ReplaceAll(keyName, "/", "_"))
+					keyName = strings.ReplaceAll(keyName, "-", "_")
+
+					if keyName != "" {
+						envVars[keyName] = secretValue
+					}
+				}
+			}
+		}
+
+		// Process env section
+		for envVarName, envConfig := range crumbConfig.Env {
+			if secretValue, exists := secrets[envConfig.Path]; exists {
+				// Sanitize environment variable name
+				sanitizedEnvVarName := strings.ToUpper(strings.ReplaceAll(envVarName, "-", "_"))
+				envVars[sanitizedEnvVarName] = secretValue
+			}
+		}
+
+		// Apply remap mappings
+		for originalKey, newKey := range crumbConfig.PathSync.Remap {
+			// Sanitize both original and new key names
+			sanitizedOriginalKey := strings.ToUpper(strings.ReplaceAll(originalKey, "-", "_"))
+			sanitizedNewKey := strings.ToUpper(strings.ReplaceAll(newKey, "-", "_"))
+
+			if value, exists := envVars[sanitizedOriginalKey]; exists {
+				envVars[sanitizedNewKey] = value
+				delete(envVars, sanitizedOriginalKey)
+			}
 		}
 	}
 
