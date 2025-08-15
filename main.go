@@ -129,6 +129,13 @@ func main() {
 				ArgsUsage: "<key-path>",
 			},
 			{
+				Name:      "move",
+				Aliases:   []string{"mv"},
+				Usage:     "Rename a secret key to a new path (preserves value)",
+				Action:    moveCommand,
+				ArgsUsage: "<old-key-path> <new-key-path>",
+			},
+			{
 				Name:  "export",
 				Usage: "Export secrets as shell-compatible environment variables",
 				Flags: []cli.Flag{
@@ -858,6 +865,67 @@ func deleteCommand(_ context.Context, cmd *cli.Command) error {
 	}
 
 	fmt.Printf("Successfully deleted key: %s\n", keyPath)
+	return nil
+}
+
+func moveCommand(_ context.Context, cmd *cli.Command) error {
+	// Check arguments
+	if cmd.Args().Len() != 2 {
+		return fmt.Errorf("usage: crumb move <old-key-path> <new-key-path>")
+	}
+
+	oldKeyPath := cmd.Args().Get(0)
+	newKeyPath := cmd.Args().Get(1)
+
+	// Validate key paths
+	if err := validateKeyPath(oldKeyPath); err != nil {
+		return fmt.Errorf("invalid old key path: %w", err)
+	}
+	if err := validateKeyPath(newKeyPath); err != nil {
+		return fmt.Errorf("invalid new key path: %w", err)
+	}
+
+	// Load configuration
+	profile := getProfile(cmd)
+	config, err := loadConfig(profile)
+	if err != nil {
+		return err
+	}
+
+	// Get storage path
+	storagePath := getStoragePath(cmd, config)
+
+	// Load and decrypt secrets
+	secrets, err := loadSecrets(config.PrivateKeyPath, storagePath)
+	if err != nil {
+		return err
+	}
+
+	// Check if old key exists
+	value, exists := secrets[oldKeyPath]
+	if !exists {
+		return fmt.Errorf("old key not found: %s", oldKeyPath)
+	}
+
+	// Check if new key already exists
+	if _, exists := secrets[newKeyPath]; exists {
+		fmt.Printf("New key path '%s' already exists with value: %s\n", newKeyPath, secrets[newKeyPath])
+		if !confirmOverwrite("key") {
+			fmt.Println("Operation cancelled.")
+			return nil
+		}
+	}
+
+	// Move the key-value pair
+	secrets[newKeyPath] = value
+	delete(secrets, oldKeyPath)
+
+	// Save encrypted secrets
+	if err := saveSecrets(secrets, config.PublicKeyPath, storagePath); err != nil {
+		return err
+	}
+
+	fmt.Printf("Successfully moved key from %s to %s\n", oldKeyPath, newKeyPath)
 	return nil
 }
 

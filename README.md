@@ -364,6 +364,7 @@ will result in SOME-SECRET-KEY being exported as MY-KEY
 export MY-KEY=******
 ```
 
+
 ### Delete Command
 
 The `delete` command deletes a secret key-value pair from the encrypted file.
@@ -403,6 +404,48 @@ Error: key path must start with '/'
 
 $ crumb delete "/test/key with spaces"
 Error: key path cannot contain spaces
+```
+
+### Move Command
+
+The `move` (or `mv`) command renames a secret key to a new path, preserving its value. This is useful for reorganizing or refactoring your secret key structure without losing data.
+
+```bash
+crumb move <old-key-path> <new-key-path>
+# or using the alias
+crumb mv <old-key-path> <new-key-path>
+```
+
+This command:
+- Validates both the old and new key paths (must start with `/`, no spaces or special characters)
+- Decrypts the secrets file using the private key
+- Checks that the old key exists
+- Checks if the new key already exists and prompts for confirmation before overwriting
+- Moves the value from the old key to the new key
+- Removes the old key
+- Re-encrypts and saves the secrets file
+- Fails gracefully if the old key does not exist
+
+#### Example Usage
+
+```bash
+# Move a secret key to a new path
+$ crumb move /foo/bar /baz/bar
+Successfully moved key from /foo/bar to /baz/bar
+
+# Attempt to move a non-existent key
+$ crumb move /does/not/exist /new/path
+old key not found: /does/not/exist
+
+# Overwrite an existing key (with confirmation)
+$ crumb move /prod/api_key /test/api_key
+New key path '/test/api_key' already exists with value: testsecret
+key already exists. Overwrite? (y/n): y
+Successfully moved key from /prod/api_key to /test/api_key
+
+# Invalid key path
+$ crumb move invalid_key /new/path
+invalid old key path: key path must start with '/'
 ```
 
 ### Storage Management Commands
