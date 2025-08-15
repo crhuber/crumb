@@ -83,7 +83,8 @@ func main() {
 				Action: setupCommand,
 			},
 			{
-				Name:      "ls",
+				Name:      "list",
+				Aliases:   []string{"ls"},
 				Usage:     "List stored secret keys",
 				Action:    listCommand,
 				ArgsUsage: "[path]",
@@ -122,6 +123,7 @@ func main() {
 			},
 			{
 				Name:      "delete",
+				Aliases:   []string{"rm"},
 				Usage:     "Delete a secret key-value pair",
 				Action:    deleteCommand,
 				ArgsUsage: "<key-path>",
