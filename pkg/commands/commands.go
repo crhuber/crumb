@@ -91,9 +91,7 @@ func SetupCommand(_ context.Context, cmd *cli.Command) error {
 		if err == nil {
 			// Parse existing full config to preserve other profiles
 			// This loads the complete config with all profiles
-			if err := yaml.Unmarshal(configData, &cfg); err == nil {
-				// Successfully loaded existing config
-			}
+			yaml.Unmarshal(configData, &cfg)
 		}
 	}
 
