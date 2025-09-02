@@ -647,26 +647,6 @@ func decryptData(encryptedData []byte, identity age.Identity) (string, error) {
 	return string(decryptedData), nil
 }
 
-// parseSecrets parses the decrypted secrets content into a map
-func parseSecrets(content string) map[string]string {
-	secrets := make(map[string]string)
-	lines := strings.Split(content, "\n")
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 {
-			secrets[parts[0]] = parts[1]
-		}
-	}
-
-	return secrets
-}
-
 // Placeholder functions for other commands
 func listCommand(_ context.Context, cmd *cli.Command) error {
 	// Get optional path filter argument

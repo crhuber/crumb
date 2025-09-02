@@ -7,6 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"crumb/pkg/config"
+	"crumb/pkg/storage"
 )
 
 // Integration tests for CLI commands
@@ -95,7 +98,7 @@ func TestListCommandIntegration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getFilteredKeys(testSecrets, tt.pathFilter)
+			result := storage.GetFilteredKeys(testSecrets, tt.pathFilter)
 
 			if len(result) != len(tt.expected) {
 				t.Errorf("Expected %d keys, got %d", len(tt.expected), len(result))
@@ -192,7 +195,7 @@ func TestDeleteCommandIntegration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateKeyPath(tt.keyPath)
+			err := config.ValidateKeyPath(tt.keyPath)
 			if tt.wantErr && err == nil {
 				t.Errorf("Expected error for key path %q", tt.keyPath)
 			}
@@ -227,26 +230,26 @@ env:
 	}
 
 	// Test config loading
-	config, err := loadCrumbConfig(configPath)
+	cfg, err := config.LoadCrumbConfig(configPath)
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
 	// Validate config structure
-	if config.Version != "1" {
-		t.Errorf("Expected version '1', got '%s'", config.Version)
+	if cfg.Version != "1" {
+		t.Errorf("Expected version '1', got '%s'", cfg.Version)
 	}
 
-	if config.PathSync.Path != "/prod/billing-svc" {
-		t.Errorf("Expected path '/prod/billing-svc', got '%s'", config.PathSync.Path)
+	if cfg.PathSync.Path != "/prod/billing-svc" {
+		t.Errorf("Expected path '/prod/billing-svc', got '%s'", cfg.PathSync.Path)
 	}
 
-	if len(config.Env) != 2 {
-		t.Errorf("Expected 2 env entries, got %d", len(config.Env))
+	if len(cfg.Env) != 2 {
+		t.Errorf("Expected 2 env entries, got %d", len(cfg.Env))
 	}
 
-	if config.Env["DATABASE_URL"].Path != "/prod/billing-svc/db/url" {
-		t.Errorf("Expected DATABASE_URL path '/prod/billing-svc/db/url', got '%s'", config.Env["DATABASE_URL"].Path)
+	if cfg.Env["DATABASE_URL"].Path != "/prod/billing-svc/db/url" {
+		t.Errorf("Expected DATABASE_URL path '/prod/billing-svc/db/url', got '%s'", cfg.Env["DATABASE_URL"].Path)
 	}
 }
 
@@ -281,7 +284,7 @@ func TestGetCommandIntegration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateKeyPath(tt.keyPath)
+			err := config.ValidateKeyPath(tt.keyPath)
 			if tt.wantErr && err == nil {
 				t.Errorf("Expected error for key path %q", tt.keyPath)
 			}
@@ -295,21 +298,21 @@ func TestGetCommandIntegration(t *testing.T) {
 // Test edge cases and error handling
 func TestErrorHandling(t *testing.T) {
 	t.Run("empty secrets file", func(t *testing.T) {
-		secrets := parseSecrets("")
+		secrets := storage.ParseSecrets("")
 		if len(secrets) != 0 {
 			t.Errorf("Expected empty secrets map, got %d entries", len(secrets))
 		}
 	})
 
 	t.Run("malformed secrets line", func(t *testing.T) {
-		secrets := parseSecrets("invalid-line-without-equals")
+		secrets := storage.ParseSecrets("invalid-line-without-equals")
 		if len(secrets) != 0 {
 			t.Errorf("Expected empty secrets map for malformed line, got %d entries", len(secrets))
 		}
 	})
 
 	t.Run("secrets with empty values", func(t *testing.T) {
-		secrets := parseSecrets("/test/key=")
+		secrets := storage.ParseSecrets("/test/key=")
 		if len(secrets) != 1 {
 			t.Errorf("Expected 1 secret, got %d", len(secrets))
 		}
@@ -319,7 +322,7 @@ func TestErrorHandling(t *testing.T) {
 	})
 
 	t.Run("secrets with equals in value", func(t *testing.T) {
-		secrets := parseSecrets("/test/key=value=with=equals")
+		secrets := storage.ParseSecrets("/test/key=value=with=equals")
 		if len(secrets) != 1 {
 			t.Errorf("Expected 1 secret, got %d", len(secrets))
 		}
@@ -339,7 +342,7 @@ func BenchmarkGetFilteredKeys(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		getFilteredKeys(secrets, "/prod/service1")
+		storage.GetFilteredKeys(secrets, "/prod/service1")
 	}
 }
 
@@ -353,7 +356,7 @@ func BenchmarkParseSecrets(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		parseSecrets(content)
+		storage.ParseSecrets(content)
 	}
 }
 
@@ -362,6 +365,6 @@ func BenchmarkValidateKeyPath(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		validateKeyPath(keyPath)
+		config.ValidateKeyPath(keyPath)
 	}
 }
