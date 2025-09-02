@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"crumb/pkg/config"
+	"crumb/pkg/storage"
 )
 
 // Test helper functions
@@ -107,7 +110,7 @@ func TestValidateKeyPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateKeyPath(tt.keyPath)
+			err := config.ValidateKeyPath(tt.keyPath)
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("validateKeyPath() expected error but got none")
@@ -188,7 +191,7 @@ func TestGetFilteredKeys(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getFilteredKeys(secrets, tt.pathFilter)
+			result := storage.GetFilteredKeys(secrets, tt.pathFilter)
 
 			if len(result) != len(tt.expected) {
 				t.Errorf("getFilteredKeys() got %d keys, want %d", len(result), len(tt.expected))
@@ -214,7 +217,7 @@ func TestLoadCrumbConfig(t *testing.T) {
 		content     string
 		wantErr     bool
 		errContains string
-		validate    func(*testing.T, *CrumbConfig)
+		validate    func(*testing.T, *config.CrumbConfig)
 	}{
 		{
 			name:       "valid config",
@@ -228,18 +231,18 @@ env:
   DATABASE_URL:
     path: "/prod/billing-svc/db/url"`,
 			wantErr: false,
-			validate: func(t *testing.T, config *CrumbConfig) {
-				if config.Version != "1" {
-					t.Errorf("Expected version '1', got '%s'", config.Version)
+			validate: func(t *testing.T, cfg *config.CrumbConfig) {
+				if cfg.Version != "1" {
+					t.Errorf("Expected version '1', got '%s'", cfg.Version)
 				}
-				if config.PathSync.Path != "/prod/billing-svc" {
-					t.Errorf("Expected path '/prod/billing-svc', got '%s'", config.PathSync.Path)
+				if cfg.PathSync.Path != "/prod/billing-svc" {
+					t.Errorf("Expected path '/prod/billing-svc', got '%s'", cfg.PathSync.Path)
 				}
-				if config.PathSync.Remap["VARS_MG"] != "MG_KEY" {
-					t.Errorf("Expected remap VARS_MG -> MG_KEY, got '%s'", config.PathSync.Remap["VARS_MG"])
+				if cfg.PathSync.Remap["VARS_MG"] != "MG_KEY" {
+					t.Errorf("Expected remap VARS_MG -> MG_KEY, got '%s'", cfg.PathSync.Remap["VARS_MG"])
 				}
-				if config.Env["DATABASE_URL"].Path != "/prod/billing-svc/db/url" {
-					t.Errorf("Expected env path '/prod/billing-svc/db/url', got '%s'", config.Env["DATABASE_URL"].Path)
+				if cfg.Env["DATABASE_URL"].Path != "/prod/billing-svc/db/url" {
+					t.Errorf("Expected env path '/prod/billing-svc/db/url', got '%s'", cfg.Env["DATABASE_URL"].Path)
 				}
 			},
 		},
@@ -279,7 +282,7 @@ env: {}`,
 				}
 			}
 
-			config, err := loadCrumbConfig(configPath)
+			cfg, err := config.LoadCrumbConfig(configPath)
 
 			if tt.wantErr {
 				if err == nil {
@@ -291,8 +294,8 @@ env: {}`,
 				if err != nil {
 					t.Errorf("loadCrumbConfig() unexpected error = %v", err)
 				}
-				if config != nil && tt.validate != nil {
-					tt.validate(t, config)
+				if cfg != nil && tt.validate != nil {
+					tt.validate(t, cfg)
 				}
 			}
 		})
@@ -390,26 +393,26 @@ func TestConfigInitialization(t *testing.T) {
 		t.Fatalf("Failed to write test config: %v", err)
 	}
 
-	config, err := loadCrumbConfig(configPath)
+	cfg, err := config.LoadCrumbConfig(configPath)
 	if err != nil {
 		t.Fatalf("loadCrumbConfig() failed: %v", err)
 	}
 
 	// Test that maps are initialized
-	if config.Env == nil {
+	if cfg.Env == nil {
 		t.Error("Env map should be initialized")
 	}
 
-	if config.PathSync.Remap == nil {
+	if cfg.PathSync.Remap == nil {
 		t.Error("PathSync.Remap map should be initialized")
 	}
 
 	// Test they are empty but not nil
-	if len(config.Env) != 0 {
+	if len(cfg.Env) != 0 {
 		t.Error("Env map should be empty")
 	}
 
-	if len(config.PathSync.Remap) != 0 {
+	if len(cfg.PathSync.Remap) != 0 {
 		t.Error("PathSync.Remap map should be empty")
 	}
 }
@@ -428,7 +431,7 @@ func TestSecretParsing(t *testing.T) {
 		"/dev/test":                     "value",
 	}
 
-	result := parseSecrets(secretsContent)
+	result := storage.ParseSecrets(secretsContent)
 
 	if len(result) != len(expected) {
 		t.Errorf("Expected %d secrets, got %d", len(expected), len(result))
@@ -562,7 +565,7 @@ env:
 	}
 
 	// Simulate the export logic for environment variable sanitization
-	crumbConfig, err := loadCrumbConfig(configPath)
+	crumbConfig, err := config.LoadCrumbConfig(configPath)
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
