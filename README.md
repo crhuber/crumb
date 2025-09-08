@@ -32,6 +32,7 @@ kelp add crhuber/crumb --install
 - **Environment Variables**: Use `CRUMB_PROFILE` and `CRUMB_STORAGE` for easy integration
 - **Global Flags**: Override settings with `--profile` and `--storage` flags
 - **Storage Management**: Built-in commands to configure storage paths per profile
+- **Bulk Import**: Import multiple secrets from `.env` files with conflict detection and overwrite protection
 
 ## Global Flags
 
@@ -448,6 +449,82 @@ $ crumb move invalid_key /new/path
 invalid old key path: key path must start with '/'
 ```
 
+### Import Command
+
+The `import` command allows you to import multiple secrets from a `.env` file into your encrypted storage. This is particularly useful when migrating from `.env` files to Crumb or when setting up a new project with existing environment variables.
+
+```bash
+crumb import --file <path-to-env-file> --path <destination-path>
+```
+
+This command:
+- Parses a `.env` file to extract environment variables and their values
+- Validates the destination path (must start with `/`, no spaces or special characters)
+- Converts environment variable names to lowercase for storage paths
+- Detects conflicts with existing secrets and prompts for confirmation
+- Creates the destination path structure if it doesn't exist
+- Imports all variables as individual secrets under the specified path
+- Re-encrypts and saves the secrets file
+
+#### .env File Format Support
+
+The import command supports standard `.env` file formats:
+
+```bash
+# Comments are ignored
+API_KEY=secret123
+DATABASE_URL="postgresql://localhost:5432/mydb"
+DEBUG=true
+EMPTY_VAR=
+QUOTED_VALUE='single-quoted-value'
+COMPLEX_URL=https://api.example.com?token=abc123&refresh=def456
+```
+
+Supported features:
+- Comments (lines starting with `#`)
+- Empty lines (ignored)
+- Quoted values (both single and double quotes)
+- Values containing special characters and equals signs
+- Empty values
+
+#### Example Usage
+
+**Basic import:**
+```bash
+# Create a .env file
+$ cat > .env << EOF
+API_KEY=secret123
+DATABASE_URL="postgresql://localhost:5432/mydb"
+REDIS_URL=redis://localhost:6379
+DEBUG=true
+EOF
+
+# Import to /dev/myapp path
+$ crumb import --file .env --path /dev/myapp
+Found 4 environment variables in .env
+New keys to import: 4
+Successfully imported 4 secrets from .env to /dev/myapp
+
+# Verify the imported secrets
+$ crumb ls /dev/myapp
+/dev/myapp/api_key
+/dev/myapp/database_url
+/dev/myapp/debug
+/dev/myapp/redis_url
+```
+
+**Using with different profiles:**
+```bash
+# Import to work profile
+$ crumb --profile work import --file work.env --path /work/secrets
+Found 6 environment variables in work.env
+New keys to import: 6
+Successfully imported 6 secrets from work.env to /work/secrets
+
+# Import to custom storage location
+$ crumb --storage ~/project-secrets import --file project.env --path /project/config
+```
+
 ### Storage Management Commands
 
 The `storage` command provides subcommands to manage storage file paths for profiles.
@@ -558,6 +635,59 @@ crumb --profile work --storage ~/work-backup get /api/key
 ```
 
 ## Practical Examples
+
+### Migrating from .env Files
+
+```bash
+# Existing project with .env file
+$ cat .env
+DATABASE_URL=postgresql://localhost/myapp
+API_KEY=abc123
+REDIS_URL=redis://localhost:6379
+SECRET_KEY=super-secret-key
+
+# Set up Crumb for the project
+crumb setup
+
+# Import all environment variables at once
+crumb import --file .env --path /myapp/config
+Found 4 environment variables in .env
+New keys to import: 4
+Successfully imported 4 secrets from .env to /myapp/config
+
+# Verify the import
+crumb ls /myapp/config
+/myapp/config/api_key
+/myapp/config/database_url
+/myapp/config/redis_url
+/myapp/config/secret_key
+
+# Create project configuration for easy exporting
+crumb init
+cat > .crumb.yaml << EOF
+version: "1.0"
+path_sync:
+  path: "/myapp/config"
+  remap:
+    SECRET_KEY: "APP_SECRET_KEY"
+env: {}
+EOF
+
+# Test the export (should match original .env vars)
+crumb export
+# Output:
+# export API_KEY=abc123
+# export DATABASE_URL=postgresql://localhost/myapp
+# export REDIS_URL=redis://localhost:6379
+# export APP_SECRET_KEY=super-secret-key
+
+# Now you can safely remove the .env file
+# rm .env
+
+# Use in development
+eval "$(crumb export)"
+echo $DATABASE_URL  # postgresql://localhost/myapp
+```
 
 ### Work and Personal Separation
 
