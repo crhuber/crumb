@@ -566,6 +566,115 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 	return nil
 }
 
+// ImportCommand handles importing secrets from a .env file
+func ImportCommand(_ context.Context, cmd *cli.Command) error {
+	// Check required flags
+	filePath := cmd.String("file")
+	basePath := cmd.String("path")
+
+	if filePath == "" {
+		return fmt.Errorf("--file flag is required")
+	}
+	if basePath == "" {
+		return fmt.Errorf("--path flag is required")
+	}
+
+	// Validate base path
+	if err := config.ValidateKeyPath(basePath); err != nil {
+		return fmt.Errorf("invalid path: %w", err)
+	}
+
+	// Parse .env file
+	envVars, err := storage.ParseEnvFile(filePath)
+	if err != nil {
+		return err
+	}
+
+	if len(envVars) == 0 {
+		fmt.Println("No environment variables found in the .env file")
+		return nil
+	}
+
+	// Load configuration
+	profile := getProfile(cmd)
+	cfg, err := config.LoadConfig(profile)
+	if err != nil {
+		return err
+	}
+
+	// Get storage path
+	storagePath := config.GetStoragePath(cmd.String("storage"), cfg)
+
+	// Load and decrypt existing secrets
+	secrets, err := storage.LoadSecrets(cfg.PrivateKeyPath, storagePath)
+	if err != nil {
+		return err
+	}
+
+	// Ensure base path ends without trailing slash for consistency
+	basePath = strings.TrimSuffix(basePath, "/")
+
+	// Track conflicts and new keys
+	var conflicts []string
+	var newKeys []string
+
+	// Process each environment variable
+	for envKey := range envVars {
+		// Create full key path (preserve original case)
+		fullKeyPath := basePath + "/" + envKey
+
+		// Check if key already exists
+		if _, exists := storage.SecretExists(secrets, fullKeyPath); exists {
+			conflicts = append(conflicts, fullKeyPath)
+		} else {
+			newKeys = append(newKeys, fullKeyPath)
+		}
+	}
+
+	// Display summary
+	fmt.Printf("Found %d environment variables in %s\n", len(envVars), filePath)
+	if len(newKeys) > 0 {
+		fmt.Printf("New keys to import: %d\n", len(newKeys))
+	}
+	if len(conflicts) > 0 {
+		fmt.Printf("Existing keys that will be updated: %d\n", len(conflicts))
+		for _, key := range conflicts {
+			fmt.Printf("  - %s\n", key)
+		}
+	}
+
+	// Confirm import if there are conflicts
+	if len(conflicts) > 0 {
+		fmt.Print("Continue with import? This will overwrite existing keys. (y/n): ")
+		reader := bufio.NewReader(os.Stdin)
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("failed to read input: %w", err)
+		}
+		response = strings.TrimSpace(strings.ToLower(response))
+		if response != "y" && response != "yes" {
+			fmt.Println("Import cancelled.")
+			return nil
+		}
+	}
+
+	// Import the secrets
+	importedCount := 0
+	for envKey, envValue := range envVars {
+		fullKeyPath := basePath + "/" + envKey
+		storage.SetSecret(secrets, fullKeyPath, envValue)
+		importedCount++
+	}
+
+	// Save encrypted secrets
+	if err := storage.SaveSecrets(secrets, cfg.PublicKeyPath, storagePath); err != nil {
+		return err
+	}
+
+	fmt.Printf("Successfully imported %d secrets from %s to %s\n", importedCount, filePath, basePath)
+	return nil
+}
+
 // Helper functions
 
 func getProfile(cmd *cli.Command) string {

@@ -253,3 +253,51 @@ func ConvertPathToEnvVar(secretPath, pathPrefix string) string {
 
 	return ""
 }
+
+// ParseEnvFile parses a .env file and returns a map of key-value pairs
+func ParseEnvFile(filePath string) (map[string]string, error) {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read .env file: %w", err)
+	}
+
+	return parseEnvContent(string(content)), nil
+}
+
+// parseEnvContent parses .env file content into a map
+func parseEnvContent(content string) map[string]string {
+	envVars := make(map[string]string)
+	lines := strings.Split(content, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// Find the first = sign
+		eqIndex := strings.Index(line, "=")
+		if eqIndex == -1 {
+			continue
+		}
+
+		key := strings.TrimSpace(line[:eqIndex])
+		value := strings.TrimSpace(line[eqIndex+1:])
+
+		// Remove quotes from value if present
+		if len(value) >= 2 {
+			if (strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"")) ||
+				(strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'")) {
+				value = value[1 : len(value)-1]
+			}
+		}
+
+		if key != "" {
+			envVars[key] = value
+		}
+	}
+
+	return envVars
+}

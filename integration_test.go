@@ -368,3 +368,175 @@ func BenchmarkValidateKeyPath(b *testing.B) {
 		config.ValidateKeyPath(keyPath)
 	}
 }
+
+func TestImportCommandIntegration(t *testing.T) {
+	tempDir := createTempDir(t)
+	defer os.RemoveAll(tempDir)
+
+	// Create test .env file
+	envContent := `# Test environment variables
+API_KEY=secret123
+DATABASE_URL="postgresql://localhost:5432/testdb"
+DEBUG=true
+EMPTY_VAR=
+SPECIAL_CHARS='value-with-dashes_and_underscores'
+URL_WITH_EQUALS=https://api.example.com?token=abc123&refresh=def456`
+
+	envFile := filepath.Join(tempDir, "test.env")
+	err := os.WriteFile(envFile, []byte(envContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test .env file: %v", err)
+	}
+
+	// Test parsing the .env file
+	t.Run("parse env file", func(t *testing.T) {
+		parsed, err := storage.ParseEnvFile(envFile)
+		if err != nil {
+			t.Fatalf("Failed to parse .env file: %v", err)
+		}
+
+		expected := map[string]string{
+			"API_KEY":         "secret123",
+			"DATABASE_URL":    "postgresql://localhost:5432/testdb",
+			"DEBUG":           "true",
+			"EMPTY_VAR":       "",
+			"SPECIAL_CHARS":   "value-with-dashes_and_underscores",
+			"URL_WITH_EQUALS": "https://api.example.com?token=abc123&refresh=def456",
+		}
+
+		if len(parsed) != len(expected) {
+			t.Errorf("Expected %d variables, got %d", len(expected), len(parsed))
+		}
+
+		for key, expectedValue := range expected {
+			if actualValue, exists := parsed[key]; !exists {
+				t.Errorf("Expected key %s not found", key)
+			} else if actualValue != expectedValue {
+				t.Errorf("For key %s: expected %q, got %q", key, expectedValue, actualValue)
+			}
+		}
+	})
+
+	// Test key path generation
+	t.Run("key path generation", func(t *testing.T) {
+		basePath := "/dev/test"
+		envKey := "API_KEY"
+		expectedPath := "/dev/test/API_KEY"
+
+		fullKeyPath := basePath + "/" + envKey
+		if fullKeyPath != expectedPath {
+			t.Errorf("Expected key path %s, got %s", expectedPath, fullKeyPath)
+		}
+
+		// Validate the generated path
+		if err := config.ValidateKeyPath(fullKeyPath); err != nil {
+			t.Errorf("Generated key path %s should be valid: %v", fullKeyPath, err)
+		}
+	})
+
+	// Test integration with existing secrets
+	t.Run("integration with secrets storage", func(t *testing.T) {
+		// Create some existing test secrets
+		existingSecrets := map[string]string{
+			"/dev/test/existing_key": "existing_value",
+			"/dev/test/API_KEY":      "old_api_value", // This should conflict
+		}
+
+		// Parse env vars
+		envVars, err := storage.ParseEnvFile(envFile)
+		if err != nil {
+			t.Fatalf("Failed to parse env file: %v", err)
+		}
+
+		// Check for conflicts
+		basePath := "/dev/test"
+		conflicts := []string{}
+		newKeys := []string{}
+
+		for envKey := range envVars {
+			fullKeyPath := basePath + "/" + envKey
+			if _, exists := existingSecrets[fullKeyPath]; exists {
+				conflicts = append(conflicts, fullKeyPath)
+			} else {
+				newKeys = append(newKeys, fullKeyPath)
+			}
+		}
+
+		// We expect 1 conflict (api_key) and 5 new keys
+		if len(conflicts) != 1 {
+			t.Errorf("Expected 1 conflict, got %d", len(conflicts))
+		}
+
+		if len(newKeys) != 5 {
+			t.Errorf("Expected 5 new keys, got %d", len(newKeys))
+		}
+
+		// Check specific conflict
+		expectedConflict := "/dev/test/API_KEY"
+		found := false
+		for _, conflict := range conflicts {
+			if conflict == expectedConflict {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected conflict for %s not found", expectedConflict)
+		}
+	})
+
+	// Test path validation
+	t.Run("path validation", func(t *testing.T) {
+		validPaths := []string{
+			"/dev/test",
+			"/prod/api",
+			"/staging/db",
+		}
+
+		invalidPaths := []string{
+			"dev/test",  // no leading slash
+			"/dev test", // contains space
+			"/dev=test", // contains equals
+			"",          // empty
+		}
+
+		for _, path := range validPaths {
+			if err := config.ValidateKeyPath(path); err != nil {
+				t.Errorf("Path %s should be valid: %v", path, err)
+			}
+		}
+
+		for _, path := range invalidPaths {
+			if err := config.ValidateKeyPath(path); err == nil {
+				t.Errorf("Path %s should be invalid", path)
+			}
+		}
+	})
+
+	// Test file not found error
+	t.Run("non-existent env file", func(t *testing.T) {
+		nonExistentFile := filepath.Join(tempDir, "does_not_exist.env")
+		_, err := storage.ParseEnvFile(nonExistentFile)
+		if err == nil {
+			t.Error("Expected error for non-existent file")
+		}
+	})
+
+	// Test empty env file
+	t.Run("empty env file", func(t *testing.T) {
+		emptyEnvFile := filepath.Join(tempDir, "empty.env")
+		err := os.WriteFile(emptyEnvFile, []byte(""), 0644)
+		if err != nil {
+			t.Fatalf("Failed to create empty env file: %v", err)
+		}
+
+		parsed, err := storage.ParseEnvFile(emptyEnvFile)
+		if err != nil {
+			t.Fatalf("Failed to parse empty env file: %v", err)
+		}
+
+		if len(parsed) != 0 {
+			t.Errorf("Expected empty map for empty file, got %d entries", len(parsed))
+		}
+	})
+}
