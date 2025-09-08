@@ -421,9 +421,9 @@ URL_WITH_EQUALS=https://api.example.com?token=abc123&refresh=def456`
 	t.Run("key path generation", func(t *testing.T) {
 		basePath := "/dev/test"
 		envKey := "API_KEY"
-		expectedPath := "/dev/test/api_key"
+		expectedPath := "/dev/test/API_KEY"
 
-		fullKeyPath := basePath + "/" + strings.ToLower(envKey)
+		fullKeyPath := basePath + "/" + envKey
 		if fullKeyPath != expectedPath {
 			t.Errorf("Expected key path %s, got %s", expectedPath, fullKeyPath)
 		}
@@ -439,7 +439,7 @@ URL_WITH_EQUALS=https://api.example.com?token=abc123&refresh=def456`
 		// Create some existing test secrets
 		existingSecrets := map[string]string{
 			"/dev/test/existing_key": "existing_value",
-			"/dev/test/api_key":      "old_api_value", // This should conflict
+			"/dev/test/API_KEY":      "old_api_value", // This should conflict
 		}
 
 		// Parse env vars
@@ -454,7 +454,7 @@ URL_WITH_EQUALS=https://api.example.com?token=abc123&refresh=def456`
 		newKeys := []string{}
 
 		for envKey := range envVars {
-			fullKeyPath := basePath + "/" + strings.ToLower(envKey)
+			fullKeyPath := basePath + "/" + envKey
 			if _, exists := existingSecrets[fullKeyPath]; exists {
 				conflicts = append(conflicts, fullKeyPath)
 			} else {
@@ -472,7 +472,7 @@ URL_WITH_EQUALS=https://api.example.com?token=abc123&refresh=def456`
 		}
 
 		// Check specific conflict
-		expectedConflict := "/dev/test/api_key"
+		expectedConflict := "/dev/test/API_KEY"
 		found := false
 		for _, conflict := range conflicts {
 			if conflict == expectedConflict {

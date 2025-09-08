@@ -460,7 +460,7 @@ crumb import --file <path-to-env-file> --path <destination-path>
 This command:
 - Parses a `.env` file to extract environment variables and their values
 - Validates the destination path (must start with `/`, no spaces or special characters)
-- Converts environment variable names to lowercase for storage paths
+- Preserves the original case of environment variable names in storage paths
 - Detects conflicts with existing secrets and prompts for confirmation
 - Creates the destination path structure if it doesn't exist
 - Imports all variables as individual secrets under the specified path
@@ -507,10 +507,10 @@ Successfully imported 4 secrets from .env to /dev/myapp
 
 # Verify the imported secrets
 $ crumb ls /dev/myapp
-/dev/myapp/api_key
-/dev/myapp/database_url
-/dev/myapp/debug
-/dev/myapp/redis_url
+/dev/myapp/API_KEY
+/dev/myapp/DATABASE_URL
+/dev/myapp/DEBUG
+/dev/myapp/REDIS_URL
 ```
 
 **Using with different profiles:**
@@ -657,10 +657,10 @@ Successfully imported 4 secrets from .env to /myapp/config
 
 # Verify the import
 crumb ls /myapp/config
-/myapp/config/api_key
-/myapp/config/database_url
-/myapp/config/redis_url
-/myapp/config/secret_key
+/myapp/config/API_KEY
+/myapp/config/DATABASE_URL
+/myapp/config/REDIS_URL
+/myapp/config/SECRET_KEY
 
 # Create project configuration for easy exporting
 crumb init

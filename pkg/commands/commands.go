@@ -620,8 +620,8 @@ func ImportCommand(_ context.Context, cmd *cli.Command) error {
 
 	// Process each environment variable
 	for envKey := range envVars {
-		// Create full key path
-		fullKeyPath := basePath + "/" + strings.ToLower(envKey)
+		// Create full key path (preserve original case)
+		fullKeyPath := basePath + "/" + envKey
 
 		// Check if key already exists
 		if _, exists := storage.SecretExists(secrets, fullKeyPath); exists {
@@ -661,7 +661,7 @@ func ImportCommand(_ context.Context, cmd *cli.Command) error {
 	// Import the secrets
 	importedCount := 0
 	for envKey, envValue := range envVars {
-		fullKeyPath := basePath + "/" + strings.ToLower(envKey)
+		fullKeyPath := basePath + "/" + envKey
 		storage.SetSecret(secrets, fullKeyPath, envValue)
 		importedCount++
 	}
