@@ -149,3 +149,56 @@ DEBUG=true`
 		}
 	})
 }
+
+func TestShellQuoteValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "simple value no quotes needed",
+			input:    "simple_value",
+			expected: "simple_value",
+		},
+		{
+			name:     "value with spaces needs quotes",
+			input:    "server=host port=5432",
+			expected: "\"server=host port=5432\"",
+		},
+		{
+			name:     "empty value needs quotes",
+			input:    "",
+			expected: "\"\"",
+		},
+		{
+			name:     "value with equals and spaces",
+			input:    "value with = equals",
+			expected: "\"value with = equals\"",
+		},
+		{
+			name:     "value with existing quotes",
+			input:    "value with \"embedded quotes\"",
+			expected: "\"value with \\\"embedded quotes\\\"\"",
+		},
+		{
+			name:     "value with special chars",
+			input:    "value|with&special;chars",
+			expected: "\"value|with&special;chars\"",
+		},
+		{
+			name:     "value with tab",
+			input:    "value\twith\ttab",
+			expected: "\"value\twith\ttab\"",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ShellQuoteValue(tt.input)
+			if result != tt.expected {
+				t.Errorf("ShellQuoteValue(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
