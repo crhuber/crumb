@@ -482,8 +482,9 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 			}
 		}
 	} else {
-		// .crumb.yaml mode - existing logic
+		// .crumb.yaml mode with environment support
 		configFile := cmd.String("file")
+		environmentName := cmd.String("env")
 
 		// Load .crumb.yaml configuration
 		crumbConfig, err := config.LoadCrumbConfig(configFile)
@@ -491,10 +492,16 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 			return err
 		}
 
-		// Process path_sync section
-		if crumbConfig.PathSync.Path != "" {
+		// Get the specified environment
+		envConfig, exists := crumbConfig.Environments[environmentName]
+		if !exists {
+			return fmt.Errorf("environment '%s' not found in %s", environmentName, configFile)
+		}
+
+		// Process path section
+		if envConfig.Path != "" {
 			// Add comment for clarity
-			comment := fmt.Sprintf("# Exported from %s", crumbConfig.PathSync.Path)
+			comment := fmt.Sprintf("# Exported from %s (environment: %s)", envConfig.Path, environmentName)
 			switch shell {
 			case "bash":
 				fmt.Println(comment)
@@ -503,7 +510,7 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 			}
 
 			// Find all secrets that match the path prefix
-			pathPrefix := strings.TrimSuffix(crumbConfig.PathSync.Path, "/")
+			pathPrefix := strings.TrimSuffix(envConfig.Path, "/")
 			pathSecrets := storage.GetSecretsForPath(secrets, pathPrefix)
 			for secretPath, secretValue := range pathSecrets {
 				// Extract the key name from the path
@@ -519,8 +526,8 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 		}
 
 		// Process env section
-		for envVarName, envConfig := range crumbConfig.Env {
-			if secretValue, exists := storage.SecretExists(secrets, envConfig.Path); exists {
+		for envVarName, envVarPath := range envConfig.Env {
+			if secretValue, exists := storage.SecretExists(secrets, envVarPath); exists {
 				// Sanitize environment variable name
 				sanitizedEnvVarName := strings.ToUpper(strings.ReplaceAll(envVarName, "-", "_"))
 				envVars[sanitizedEnvVarName] = secretValue
@@ -528,7 +535,7 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 		}
 
 		// Apply remap mappings
-		for originalKey, newKey := range crumbConfig.PathSync.Remap {
+		for originalKey, newKey := range envConfig.Remap {
 			// Sanitize both original and new key names
 			sanitizedOriginalKey := strings.ToUpper(strings.ReplaceAll(originalKey, "-", "_"))
 			sanitizedNewKey := strings.ToUpper(strings.ReplaceAll(newKey, "-", "_"))

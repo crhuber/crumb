@@ -325,44 +325,70 @@ The created `.crumb.yaml` file contains:
 
 ```yaml
 version: "1.0"
-path_sync:
+environments:
+  default:
     path: ""
     remap: {}
-env: {}
+    env: {}
 ```
 
-This structure allows you to configure:
-- `path_sync.path`: A path to sync secrets from (e.g., `/prod/billing-svc`)
-- `path_sync.remap`: Key remapping for environment variables
+This structure allows you to configure multiple environments, each with:
+- `path`: A path to sync secrets from (e.g., `/prod/billing-svc`)
+- `remap`: Key remapping for environment variables
 - `env`: Individual environment variable configurations
+
+You can add additional environments for different deployment contexts:
+
+```yaml
+version: "1.0"
+environments:
+  default:
+    path: "/dev/myapp"
+    remap: {}
+    env:
+      DATABASE_URL: "/dev/myapp/db_url"
+  staging:
+    path: "/staging/myapp"
+    remap:
+      API_KEY: "STAGING_API_KEY"
+    env:
+      DATABASE_URL: "/staging/myapp/db_url"
+  production:
+    path: "/prod/myapp"
+    remap: {}
+    env:
+      DATABASE_URL: "/prod/myapp/db_url"
+      API_SECRET: "/prod/myapp/secret"
+```
 
 #### Remapping Keys
 
-You can change what finally gets exported to shell by using `path_sync.remap` using the following format:
+You can change what finally gets exported to shell by using the `remap` section within an environment:
 
 ```yaml
 version: "1.0"
-path_sync:
-  path: "/some/path"
-  remap: {
-        "FROM": "TO"
-    }
+environments:
+  default:
+    path: "/some/path"
+    remap:
+      "FROM": "TO"
+    env: {}
 ```
 
-
-ie:
+For example:
 ```yaml
 version: "1.0"
-path_sync:
-  path: "/some/path"
-    remap: {
-        "SOME-SECRET-KEY": "MY-KEY"
-    }
+environments:
+  default:
+    path: "/some/path"
+    remap:
+      "SOME_SECRET_KEY": "MY_KEY"
+    env: {}
 ```
-will result in SOME-SECRET-KEY being exported as MY-KEY
+will result in SOME_SECRET_KEY being exported as MY_KEY
 
 ```bash
-export MY-KEY=******
+export MY_KEY=******
 ```
 
 
@@ -666,11 +692,12 @@ crumb ls /myapp/config
 crumb init
 cat > .crumb.yaml << EOF
 version: "1.0"
-path_sync:
-  path: "/myapp/config"
-  remap:
-    SECRET_KEY: "APP_SECRET_KEY"
-env: {}
+environments:
+  default:
+    path: "/myapp/config"
+    remap:
+      SECRET_KEY: "APP_SECRET_KEY"
+    env: {}
 EOF
 
 # Test the export (should match original .env vars)
@@ -743,11 +770,13 @@ crumb init
 # Edit .crumb.yaml to reference project secrets
 cat > .crumb.yaml << EOF
 version: "1.0"
-path_sync:
-  path: "/alpha"
-  remap:
-    API_KEY: "ALPHA_API_KEY"
-    DB_URL: "ALPHA_DATABASE_URL"
+environments:
+  default:
+    path: "/alpha"
+    remap:
+      API_KEY: "ALPHA_API_KEY"
+      DB_URL: "ALPHA_DATABASE_URL"
+    env: {}
 EOF
 
 # Export project environment variables
@@ -780,7 +809,7 @@ The `export` command exports secrets as shell-compatible environment variable as
 
 ```bash
 # Config-based export
-crumb export [-f config-file] [--shell=bash|fish] [--profile <profile-name>]
+crumb export [-f config-file] [--env environment] [--shell=bash|fish] [--profile <profile-name>]
 
 # Direct path export
 crumb export --path <secret-path> [--shell=bash|fish] [--profile <profile-name>]
@@ -789,9 +818,10 @@ crumb export --path <secret-path> [--shell=bash|fish] [--profile <profile-name>]
 **Config-based mode** (when no `--path` flag is provided):
 - Uses the specified profile (or default) for accessing secrets
 - Reads the `.crumb.yaml` configuration file from the current directory (or a custom path with `-f`)
+- Uses the specified environment (or "default" with `--env` flag)
 - Validates the YAML structure and paths
 - Decrypts the secrets file using the profile's private key and storage location
-- Processes the `path_sync` section to export secrets matching a path prefix
+- Processes the `path` section to export secrets matching a path prefix
 - Processes the `env` section to export individual secrets
 - Applies remapping from the `remap` section
 - Outputs in Bash (`export VAR=value`) or Fish (`set -x VAR value`) format
@@ -808,34 +838,44 @@ crumb export --path <secret-path> [--shell=bash|fish] [--profile <profile-name>]
 First, create a `.crumb.yaml` configuration file:
 
 ```yaml
-version: 1
-path_sync:
-  path: "/prod/billing-svc"
-  remap:
-    VARS_MG: "MG_KEY"
-    VARS_STRIPE: "STRIPE_KEY"
-
-env:
-  DATABASE_URL:
-    path: "/prod/billing-svc/db/url"
-  API_SECRET:
-    path: "/prod/billing-svc/api/secret"
+version: "1.0"
+environments:
+  default:
+    path: "/prod/billing-svc"
+    remap:
+      VARS_MG: "MG_KEY"
+      VARS_STRIPE: "STRIPE_KEY"
+    env:
+      DATABASE_URL: "/prod/billing-svc/db/url"
+      API_SECRET: "/prod/billing-svc/api/secret"
+  staging:
+    path: "/staging/billing-svc"
+    remap:
+      VARS_MG: "STAGING_MG_KEY"
+    env:
+      DATABASE_URL: "/staging/billing-svc/db/url"
 ```
 
 Then export the secrets:
 
 ```bash
-# Export for bash (default)
+# Export default environment for bash (default)
 $ crumb export
-# Exported from /prod/billing-svc
+# Exported from /prod/billing-svc (environment: default)
 export API_SECRET=secret123
 export DATABASE_URL=postgres://user:pass@localhost/db
 export MG_KEY=mgsecret
 export STRIPE_KEY=stripesecret
 
+# Export staging environment
+$ crumb export --env staging
+# Exported from /staging/billing-svc (environment: staging)
+export DATABASE_URL=postgres://staging-user:pass@staging-db/db
+export STAGING_MG_KEY=staging-mgsecret
+
 # Export for fish shell
 $ crumb export --shell fish
-# Exported from /prod/billing-svc
+# Exported from /prod/billing-svc (environment: default)
 set -x API_SECRET secret123
 set -x DATABASE_URL postgres://user:pass@localhost/db
 set -x MG_KEY mgsecret
@@ -964,13 +1004,19 @@ Each profile has its own encrypted storage file:
 
 ```yaml
 version: "1.0"
-path_sync:
-  path: "/prod/my-service"
-  remap:
-    API_KEY: "SERVICE_API_KEY"
-env:
-  DATABASE_URL:
-    path: "/prod/my-service/db/url"
+environments:
+  default:
+    path: "/prod/my-service"
+    remap:
+      API_KEY: "SERVICE_API_KEY"
+    env:
+      DATABASE_URL: "/prod/my-service/db/url"
+  staging:
+    path: "/staging/my-service"
+    remap:
+      API_KEY: "STAGING_SERVICE_API_KEY"
+    env:
+      DATABASE_URL: "/staging/my-service/db/url"
 ```
 
 ## Migration from Legacy Configuration

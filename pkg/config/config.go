@@ -25,18 +25,14 @@ type ProfileConfig struct {
 
 // CrumbConfig represents the per-project configuration in .crumb.yaml
 type CrumbConfig struct {
-	Version  string               `yaml:"version"`
-	PathSync PathSync             `yaml:"path_sync"`
-	Env      map[string]EnvConfig `yaml:"env"`
+	Version      string                       `yaml:"version"`
+	Environments map[string]EnvironmentConfig `yaml:"environments"`
 }
 
-type PathSync struct {
+type EnvironmentConfig struct {
 	Path  string            `yaml:"path"`
 	Remap map[string]string `yaml:"remap"`
-}
-
-type EnvConfig struct {
-	Path string `yaml:"path"`
+	Env   map[string]string `yaml:"env"`
 }
 
 // LoadConfig loads the profile configuration from ~/.config/crumb/config.yaml
@@ -117,12 +113,20 @@ func LoadCrumbConfig(configFileName string) (*CrumbConfig, error) {
 		return nil, fmt.Errorf("invalid %s: missing version", configFileName)
 	}
 
-	// Initialize maps if they're nil
-	if config.Env == nil {
-		config.Env = make(map[string]EnvConfig)
+	// Initialize environments map if it's nil
+	if config.Environments == nil {
+		config.Environments = make(map[string]EnvironmentConfig)
 	}
-	if config.PathSync.Remap == nil {
-		config.PathSync.Remap = make(map[string]string)
+
+	// Initialize maps within each environment
+	for envName, envConfig := range config.Environments {
+		if envConfig.Remap == nil {
+			envConfig.Remap = make(map[string]string)
+		}
+		if envConfig.Env == nil {
+			envConfig.Env = make(map[string]string)
+		}
+		config.Environments[envName] = envConfig
 	}
 
 	return &config, nil
@@ -130,13 +134,18 @@ func LoadCrumbConfig(configFileName string) (*CrumbConfig, error) {
 
 // CreateDefaultCrumbConfig creates a default .crumb.yaml configuration
 func CreateDefaultCrumbConfig() *CrumbConfig {
+	defaultEnv := EnvironmentConfig{
+		Path:  "",
+		Remap: make(map[string]string),
+		Env:   make(map[string]string),
+	}
+
+	environments := make(map[string]EnvironmentConfig)
+	environments["default"] = defaultEnv
+
 	return &CrumbConfig{
-		Version: "1.0",
-		PathSync: PathSync{
-			Path:  "",
-			Remap: make(map[string]string),
-		},
-		Env: make(map[string]EnvConfig),
+		Version:      "1.0",
+		Environments: environments,
 	}
 }
 

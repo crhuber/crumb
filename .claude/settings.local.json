@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(task build)",
+      "Bash(task test:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
