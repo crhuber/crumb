@@ -222,27 +222,34 @@ func TestLoadCrumbConfig(t *testing.T) {
 		{
 			name:       "valid config",
 			configFile: "valid.yaml",
-			content: `version: 1
-path_sync:
-  path: "/prod/billing-svc"
-  remap:
-    VARS_MG: "MG_KEY"
-env:
-  DATABASE_URL:
-    path: "/prod/billing-svc/db/url"`,
+			content: `version: "1.0"
+environments:
+  default:
+    path: "/prod/billing-svc"
+    remap:
+      VARS_MG: "MG_KEY"
+    env:
+      DATABASE_URL: "/prod/billing-svc/db/url"`,
 			wantErr: false,
 			validate: func(t *testing.T, cfg *config.CrumbConfig) {
-				if cfg.Version != "1" {
-					t.Errorf("Expected version '1', got '%s'", cfg.Version)
+				if cfg.Version != "1.0" {
+					t.Errorf("Expected version '1.0', got '%s'", cfg.Version)
 				}
-				if cfg.PathSync.Path != "/prod/billing-svc" {
-					t.Errorf("Expected path '/prod/billing-svc', got '%s'", cfg.PathSync.Path)
+				
+				defaultEnv, exists := cfg.Environments["default"]
+				if !exists {
+					t.Errorf("Expected 'default' environment to exist")
+					return
 				}
-				if cfg.PathSync.Remap["VARS_MG"] != "MG_KEY" {
-					t.Errorf("Expected remap VARS_MG -> MG_KEY, got '%s'", cfg.PathSync.Remap["VARS_MG"])
+				
+				if defaultEnv.Path != "/prod/billing-svc" {
+					t.Errorf("Expected path '/prod/billing-svc', got '%s'", defaultEnv.Path)
 				}
-				if cfg.Env["DATABASE_URL"].Path != "/prod/billing-svc/db/url" {
-					t.Errorf("Expected env path '/prod/billing-svc/db/url', got '%s'", cfg.Env["DATABASE_URL"].Path)
+				if defaultEnv.Remap["VARS_MG"] != "MG_KEY" {
+					t.Errorf("Expected remap VARS_MG -> MG_KEY, got '%s'", defaultEnv.Remap["VARS_MG"])
+				}
+				if defaultEnv.Env["DATABASE_URL"] != "/prod/billing-svc/db/url" {
+					t.Errorf("Expected env path '/prod/billing-svc/db/url', got '%s'", defaultEnv.Env["DATABASE_URL"])
 				}
 			},
 		},
@@ -387,7 +394,12 @@ func TestConfigInitialization(t *testing.T) {
 	configPath := filepath.Join(tempDir, "test.yaml")
 
 	// Test with minimal config
-	minimalConfig := `version: 1`
+	minimalConfig := `version: "1.0"
+environments:
+  default:
+    path: ""
+    remap: {}
+    env: {}`
 	err := os.WriteFile(configPath, []byte(minimalConfig), 0600)
 	if err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
@@ -398,22 +410,32 @@ func TestConfigInitialization(t *testing.T) {
 		t.Fatalf("loadCrumbConfig() failed: %v", err)
 	}
 
-	// Test that maps are initialized
-	if cfg.Env == nil {
-		t.Error("Env map should be initialized")
+	// Test that environments are initialized
+	if cfg.Environments == nil {
+		t.Error("Environments map should be initialized")
 	}
 
-	if cfg.PathSync.Remap == nil {
-		t.Error("PathSync.Remap map should be initialized")
+	defaultEnv, exists := cfg.Environments["default"]
+	if !exists {
+		t.Error("Default environment should exist")
+		return
+	}
+
+	if defaultEnv.Remap == nil {
+		t.Error("Default environment Remap map should be initialized")
+	}
+
+	if defaultEnv.Env == nil {
+		t.Error("Default environment Env map should be initialized")
 	}
 
 	// Test they are empty but not nil
-	if len(cfg.Env) != 0 {
-		t.Error("Env map should be empty")
+	if len(defaultEnv.Env) != 0 {
+		t.Error("Default environment Env map should be empty")
 	}
 
-	if len(cfg.PathSync.Remap) != 0 {
-		t.Error("PathSync.Remap map should be empty")
+	if len(defaultEnv.Remap) != 0 {
+		t.Error("Default environment Remap map should be empty")
 	}
 }
 
@@ -542,15 +564,14 @@ func TestExportCommandSanitization(t *testing.T) {
 	// Create test config with dashes
 	configPath := filepath.Join(tempDir, ".crumb.yaml")
 	configContent := `version: "1.0"
-path_sync:
-  path: "/test"
-  remap:
-    CLIENT_ID: "API_CLIENT_ID"
-env:
-  database-url:
-    path: "/test/db-url"
-  api-key:
-    path: "/test/api-key"`
+environments:
+  default:
+    path: "/test"
+    remap:
+      CLIENT_ID: "API_CLIENT_ID"
+    env:
+      database-url: "/test/db-url"
+      api-key: "/test/api-key"`
 
 	err := os.WriteFile(configPath, []byte(configContent), 0600)
 	if err != nil {
@@ -572,9 +593,15 @@ env:
 
 	envVars := make(map[string]string)
 
-	// Process path_sync section (simplified)
-	if crumbConfig.PathSync.Path != "" {
-		pathPrefix := strings.TrimSuffix(crumbConfig.PathSync.Path, "/")
+	// Get default environment
+	defaultEnv, exists := crumbConfig.Environments["default"]
+	if !exists {
+		t.Fatalf("Default environment not found")
+	}
+
+	// Process path section (simplified)
+	if defaultEnv.Path != "" {
+		pathPrefix := strings.TrimSuffix(defaultEnv.Path, "/")
 		for secretPath, secretValue := range secrets {
 			if strings.HasPrefix(secretPath, pathPrefix) {
 				keyName := strings.TrimPrefix(secretPath, pathPrefix)
@@ -590,8 +617,8 @@ env:
 	}
 
 	// Process env section
-	for envVarName, envConfig := range crumbConfig.Env {
-		if secretValue, exists := secrets[envConfig.Path]; exists {
+	for envVarName, envVarPath := range defaultEnv.Env {
+		if secretValue, exists := secrets[envVarPath]; exists {
 			sanitizedEnvVarName := strings.ToUpper(strings.ReplaceAll(envVarName, "-", "_"))
 			envVars[sanitizedEnvVarName] = secretValue
 		}

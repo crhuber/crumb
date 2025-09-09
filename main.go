@@ -136,6 +136,11 @@ func main() {
 						Name:  "path",
 						Usage: "Export all secrets from a specific path (bypasses .crumb.yaml)",
 					},
+					&cli.StringFlag{
+						Name:  "env",
+						Usage: "Environment to export from .crumb.yaml (default: default)",
+						Value: "default",
+					},
 				},
 				Action: commands.ExportCommand,
 			},

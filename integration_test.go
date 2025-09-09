@@ -135,10 +135,11 @@ func TestInitCommandIntegration(t *testing.T) {
 	t.Run("create new config", func(t *testing.T) {
 		// Mock the init command logic
 		defaultConfig := `version: "1.0"
-path_sync:
-  path: ""
-  remap: {}
-env: {}`
+environments:
+  default:
+    path: ""
+    remap: {}
+    env: {}`
 
 		err := os.WriteFile(configPath, []byte(defaultConfig), 0600)
 		if err != nil {
@@ -211,17 +212,16 @@ func TestExportCommandIntegration(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	// Create test config file
-	configContent := `version: 1
-path_sync:
-  path: "/prod/billing-svc"
-  remap:
-    VARS_MG: "MG_KEY"
-    VARS_STRIPE: "STRIPE_KEY"
-env:
-  DATABASE_URL:
-    path: "/prod/billing-svc/db/url"
-  API_SECRET:
-    path: "/prod/billing-svc/api/secret"`
+	configContent := `version: "1.0"
+environments:
+  default:
+    path: "/prod/billing-svc"
+    remap:
+      VARS_MG: "MG_KEY"
+      VARS_STRIPE: "STRIPE_KEY"
+    env:
+      DATABASE_URL: "/prod/billing-svc/db/url"
+      API_SECRET: "/prod/billing-svc/api/secret"`
 
 	configPath := filepath.Join(tempDir, "test.yaml")
 	err := os.WriteFile(configPath, []byte(configContent), 0600)
@@ -236,20 +236,25 @@ env:
 	}
 
 	// Validate config structure
-	if cfg.Version != "1" {
-		t.Errorf("Expected version '1', got '%s'", cfg.Version)
+	if cfg.Version != "1.0" {
+		t.Errorf("Expected version '1.0', got '%s'", cfg.Version)
 	}
 
-	if cfg.PathSync.Path != "/prod/billing-svc" {
-		t.Errorf("Expected path '/prod/billing-svc', got '%s'", cfg.PathSync.Path)
+	defaultEnv, exists := cfg.Environments["default"]
+	if !exists {
+		t.Errorf("Expected 'default' environment to exist")
 	}
 
-	if len(cfg.Env) != 2 {
-		t.Errorf("Expected 2 env entries, got %d", len(cfg.Env))
+	if defaultEnv.Path != "/prod/billing-svc" {
+		t.Errorf("Expected path '/prod/billing-svc', got '%s'", defaultEnv.Path)
 	}
 
-	if cfg.Env["DATABASE_URL"].Path != "/prod/billing-svc/db/url" {
-		t.Errorf("Expected DATABASE_URL path '/prod/billing-svc/db/url', got '%s'", cfg.Env["DATABASE_URL"].Path)
+	if len(defaultEnv.Env) != 2 {
+		t.Errorf("Expected 2 env entries, got %d", len(defaultEnv.Env))
+	}
+
+	if defaultEnv.Env["DATABASE_URL"] != "/prod/billing-svc/db/url" {
+		t.Errorf("Expected DATABASE_URL path '/prod/billing-svc/db/url', got '%s'", defaultEnv.Env["DATABASE_URL"])
 	}
 }
 
