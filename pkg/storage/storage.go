@@ -303,3 +303,35 @@ func parseEnvContent(content string) map[string]string {
 
 	return envVars
 }
+
+// ShellQuoteValue quotes a value for safe shell consumption if needed
+func ShellQuoteValue(value string) string {
+	// Check if value needs quoting (contains spaces, special chars, etc.)
+	needsQuoting := false
+	
+	// Characters that require quoting in shell contexts
+	for _, char := range value {
+		if char == ' ' || char == '\t' || char == '|' || char == '&' || 
+		   char == ';' || char == '(' || char == ')' || char == '<' || 
+		   char == '>' || char == '`' || char == '$' || char == '"' ||
+		   char == '\'' || char == '\\' || char == '*' || char == '?' ||
+		   char == '[' || char == ']' || char == '{' || char == '}' ||
+		   char == '~' || char == '#' || char == '!' {
+			needsQuoting = true
+			break
+		}
+	}
+	
+	// Also quote if value is empty
+	if value == "" {
+		needsQuoting = true
+	}
+	
+	if needsQuoting {
+		// Use double quotes and escape any existing double quotes
+		escaped := strings.ReplaceAll(value, "\"", "\\\"")
+		return "\"" + escaped + "\""
+	}
+	
+	return value
+}
