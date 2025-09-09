@@ -25,7 +25,7 @@ type ProfileConfig struct {
 
 // CrumbConfig represents the per-project configuration in .crumb.yaml
 type CrumbConfig struct {
-	Version      string                     `yaml:"version"`
+	Version      string                       `yaml:"version"`
 	Environments map[string]EnvironmentConfig `yaml:"environments"`
 }
 
@@ -117,7 +117,7 @@ func LoadCrumbConfig(configFileName string) (*CrumbConfig, error) {
 	if config.Environments == nil {
 		config.Environments = make(map[string]EnvironmentConfig)
 	}
-	
+
 	// Initialize maps within each environment
 	for envName, envConfig := range config.Environments {
 		if envConfig.Remap == nil {
@@ -139,10 +139,10 @@ func CreateDefaultCrumbConfig() *CrumbConfig {
 		Remap: make(map[string]string),
 		Env:   make(map[string]string),
 	}
-	
+
 	environments := make(map[string]EnvironmentConfig)
 	environments["default"] = defaultEnv
-	
+
 	return &CrumbConfig{
 		Version:      "1.0",
 		Environments: environments,

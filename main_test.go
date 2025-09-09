@@ -235,13 +235,13 @@ environments:
 				if cfg.Version != "1.0" {
 					t.Errorf("Expected version '1.0', got '%s'", cfg.Version)
 				}
-				
+
 				defaultEnv, exists := cfg.Environments["default"]
 				if !exists {
 					t.Errorf("Expected 'default' environment to exist")
 					return
 				}
-				
+
 				if defaultEnv.Path != "/prod/billing-svc" {
 					t.Errorf("Expected path '/prod/billing-svc', got '%s'", defaultEnv.Path)
 				}
