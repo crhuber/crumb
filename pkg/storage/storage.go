@@ -126,18 +126,20 @@ func GetFilteredKeys(secrets map[string]string, pathFilter string) []string {
 // ExtractVarName converts a key path to a valid environment variable name
 func ExtractVarName(keyPath string) string {
 	// Remove leading slash
-	varName := strings.TrimPrefix(keyPath, "/")
+	trimmed := strings.TrimPrefix(keyPath, "/")
 
-	// Replace slashes with underscores
-	varName = strings.ReplaceAll(varName, "/", "_")
+	// Get the last segment of the path (the actual secret name)
+	pathSegments := strings.Split(trimmed, "/")
+	if len(pathSegments) > 0 {
+		varName := pathSegments[len(pathSegments)-1]
+		// Replace hyphens with underscores
+		varName = strings.ReplaceAll(varName, "-", "_")
+		// Convert to uppercase
+		varName = strings.ToUpper(varName)
+		return varName
+	}
 
-	// Replace hyphens with underscores
-	varName = strings.ReplaceAll(varName, "-", "_")
-
-	// Convert to uppercase
-	varName = strings.ToUpper(varName)
-
-	return varName
+	return ""
 }
 
 // ParseSecrets parses the decrypted secrets content into a map (public for testing)
