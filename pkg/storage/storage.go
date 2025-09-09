@@ -127,7 +127,7 @@ func GetFilteredKeys(secrets map[string]string, pathFilter string) []string {
 func ExtractVarName(keyPath string) string {
 	// Remove leading slash
 	trimmed := strings.TrimPrefix(keyPath, "/")
-	
+
 	// Get the last segment of the path (the actual secret name)
 	pathSegments := strings.Split(trimmed, "/")
 	if len(pathSegments) > 0 {
