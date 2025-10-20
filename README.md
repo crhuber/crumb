@@ -605,7 +605,6 @@ mgsecret
 
 ## Configuration
 
-### Main Configuration File
 
 `~/.config/crumb/config.yaml` - Stores profile configurations with SSH key paths and storage locations.
 
