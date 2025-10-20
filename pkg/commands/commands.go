@@ -207,8 +207,8 @@ func SetCommand(_ context.Context, cmd *cli.Command) error {
 	}
 
 	// Check if key exists and prompt for overwrite
-	if existingValue, exists := storage.SecretExists(secrets, keyPath); exists {
-		fmt.Printf("Key '%s' already exists with value: %s\n", keyPath, existingValue)
+	if _, exists := storage.SecretExists(secrets, keyPath); exists {
+		fmt.Printf("Key '%s' already exists.\n", keyPath)
 		if !crypto.ConfirmOverwrite("key") {
 			fmt.Println("Operation cancelled.")
 			return nil

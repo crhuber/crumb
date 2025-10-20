@@ -172,7 +172,7 @@ Successfully set key: /prod/api_key
 
 # Update an existing secret (with confirmation)
 $ crumb set /prod/api_key
-Key '/prod/api_key' already exists with value: secret123
+Key '/prod/api_key' already exists.
 key already exists. Overwrite? (y/n): y
 Enter secret value: [secret not shown]
 Successfully set key: /prod/api_key
