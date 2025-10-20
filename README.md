@@ -601,36 +601,9 @@ $ eval "$(crumb export --path /api)"
 - Hyphens in the secret name are converted to underscores, and the result is uppercase
 mgsecret
 
-# Source work profile secrets
-$ source <(crumb --profile work export)
-$ echo $WORK_API_KEY
-work-secret
-```
 
-#### Local shell population
-
-```bash
-# Default profile
-eval "$(crumb export)"
-
-# Work profile
-eval "$(CRUMB_PROFILE=work crumb export)"
-
-# Specific profile and config
-eval "$(crumb --profile project-x export -f project-config.yaml)"
-```
-
-## Security Features
-
-- Secrets are encrypted at rest using the `age` encryption library
-- Uses SSH public/private key pairs for encryption/decryption
-- Private keys are never stored in the secrets file
-- File locking prevents concurrent access issues
-- Decrypted data is never written to disk or exposed in logs
 
 ## Configuration
-
-The tool creates configuration files to manage multiple profiles and their storage locations:
 
 ### Main Configuration File
 
@@ -659,26 +632,6 @@ Each profile has its own encrypted storage file:
 - Default profile: `~/.config/crumb/secrets` (unless customized)
 - Named profiles: Configurable per profile (e.g., `~/.config/crumb/work-secrets`)
 
-### Project Configuration
-
-`.crumb.yaml` - Per-project configuration for exporting secrets to environment variables.
-
-```yaml
-version: "1.0"
-environments:
-  default:
-    path: "/prod/my-service"
-    remap:
-      API_KEY: "SERVICE_API_KEY"
-    env:
-      DATABASE_URL: "/prod/my-service/db/url"
-  staging:
-    path: "/staging/my-service"
-    remap:
-      API_KEY: "STAGING_SERVICE_API_KEY"
-    env:
-      DATABASE_URL: "/staging/my-service/db/url"
-```
 
 ## Development
 
