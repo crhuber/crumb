@@ -32,7 +32,8 @@ kelp add crhuber/crumb --install
 - **Environment Variables**: Use `CRUMB_PROFILE` and `CRUMB_STORAGE` for easy integration
 - **Global Flags**: Override settings with `--profile` and `--storage` flags
 - **Storage Management**: Built-in commands to configure storage paths per profile
-- **Bulk Import**: Import multiple secrets from `.env` files with conflict detection and overwrite protection
+- **Bulk Export**: Explorts multiple secrets from a entire path like `/app/prod/`
+- **.env Import**: Import multiple secrets from `.env` files with conflict detection and overwrite protection
 
 ## Global Flags
 
@@ -111,8 +112,6 @@ crumb ls [path]
 This command:
 - Decrypts the secrets file using the private key
 - Displays all secret keys (not values) in sorted order
-- Supports optional path filtering with partial matching
-- Treats trailing slashes as equivalent (e.g., `/any/` vs `/any`)
 
 #### Example Usage
 
@@ -121,29 +120,16 @@ This command:
 $ crumb ls
 /any/other/mykey
 /any/path/mykey
-/prod/api_key
-/prod/auth-svc/secret
-/prod/billing-svc/api_key
-/test/mykey
 
 # Filter by path prefix
 $ crumb ls /prod
 /prod/api_key
 /prod/auth-svc/secret
-/prod/billing-svc/api_key
 
 # Filter with partial matching
 $ crumb ls /any
 /any/other/mykey
 /any/path/mykey
-
-# No secrets found
-$ crumb ls /nonexistent
-No secrets found matching path: /nonexistent
-
-# Empty secrets file
-$ crumb ls
-No secrets found
 ```
 
 ### Set Command
@@ -177,13 +163,6 @@ key already exists. Overwrite? (y/n): y
 Enter secret value: [secret not shown]
 Successfully set key: /prod/api_key
 
-# Invalid key path examples
-$ crumb set invalid_key
-Error: key path must start with '/'
-
-$ crumb set "/test/key with spaces"
-Error: key path cannot contain spaces
-```
 
 ### Get Command
 
@@ -216,33 +195,17 @@ secret123
 
 # Export a secret for bash sourcing
 $ crumb get /prod/api_key --export
-export PROD_API_KEY=secret123
+export API_KEY=secret123
 
 # Export a secret for fish shell
 $ crumb get /prod/api_key --export --shell fish
-set -x PROD_API_KEY secret123
-
-
-# Export with complex key path
-$ crumb get /api/my-service/auth-token --export
-export API_MY_SERVICE_AUTH_TOKEN=token123
+set -x API_KEY secret123
 
 # Source the export directly in bash
 $ eval "$(crumb get /prod/api_key --export)"
-$ echo $PROD_API_KEY
+$ echo $API_KEY
 secret123
-
-# Key not found
-$ crumb get /nonexistent/key
-Key not found.
-
-# Invalid key path
-$ crumb get invalid_key
-Error: key path must start with '/'
-
-$ crumb get "/test/key with spaces"
-Error: key path cannot contain spaces
-
+```
 
 #### Variable Name Conversion
 
@@ -255,8 +218,8 @@ When using the `--export` flag, the key path is automatically converted to a val
 
 Examples:
 - `/api/key` → `API_KEY`
-- `/prod/my-service/auth-token` → `PROD_MY_SERVICE_AUTH_TOKEN`
-- `/billing-svc/vars/mg` → `BILLING_SVC_VARS_MG`
+- `/prod/my-service/auth-token` → `AUTH_TOKEN`
+
 
 #### Shell Integration
 
@@ -266,28 +229,21 @@ The `--export` flag makes it easy to integrate secrets into shell scripts and wo
 ```bash
 # Source a single secret
 eval "$(crumb get /api/key --export)"
-echo "API Key: $API_KEY"
+echo "Key: $KEY"
 
 # Source multiple secrets in a script
 #!/bin/bash
-eval "$(crumb get /prod/database-url --export)"
-eval "$(crumb get /prod/api-key --export)"
-eval "$(crumb get /prod/stripe-secret --export)"
-
-# Now use the environment variables
-psql "$PROD_DATABASE_URL" -c "SELECT COUNT(*) FROM users;"
-curl -H "Authorization: Bearer $PROD_API_KEY" https://api.example.com/
+eval "$(crumb get /prod/  --export)"
 ```
 
 **Fish:**
 ```fish
 # Source a single secret
 eval (crumb get /api/key --export --shell fish)
-echo "API Key: $API_KEY"
+echo "Key: $KEY"
 
 # Source multiple secrets
-eval (crumb get /prod/database-url --export --shell fish)
-eval (crumb get /prod/api-key --export --shell fish)
+eval (crumb get /prod/ --export --shell fish)
 ```
 
 ### Init Command
@@ -310,17 +266,6 @@ This command:
 # Create a new .crumb.yaml file
 $ crumb init
 Successfully created .crumb.yaml
-
-# File already exists (with confirmation)
-$ crumb init
-Config file .crumb.yaml already exists. Overwrite? (y/n): y
-Successfully created .crumb.yaml
-
-# Reject overwrite
-$ crumb init
-Config file .crumb.yaml already exists. Overwrite? (y/n): n
-Operation cancelled.
-```
 
 #### Default Configuration Structure
 
@@ -403,14 +348,6 @@ The `delete` command deletes a secret key-value pair from the encrypted file.
 crumb delete <key-path>
 ```
 
-This command:
-- Validates the key path (must start with `/`, no spaces or special characters)
-- Decrypts the secrets file using the private key
-- Prompts the user to confirm deletion by typing the exact key path
-- Removes the key-value pair if it exists
-- Re-encrypts and saves the secrets file
-- Fails gracefully if the key does not exist
-
 #### Example Usage
 
 ```bash
@@ -418,22 +355,6 @@ This command:
 $ crumb delete /prod/billing-svc/vars/mg
 Type the key path to confirm deletion: /prod/billing-svc/vars/mg
 Successfully deleted key: /prod/billing-svc/vars/mg
-
-# Wrong confirmation (deletion cancelled)
-$ crumb delete /prod/api_key
-Type the key path to confirm deletion: /wrong/path
-Confirmation failed. Deletion cancelled.
-
-# Key not found
-$ crumb delete /nonexistent/key
-Key not found.
-
-# Invalid key path
-$ crumb delete invalid_key
-Error: key path must start with '/'
-
-$ crumb delete "/test/key with spaces"
-Error: key path cannot contain spaces
 ```
 
 ### Move Command
@@ -446,37 +367,6 @@ crumb move <old-key-path> <new-key-path>
 crumb mv <old-key-path> <new-key-path>
 ```
 
-This command:
-- Validates both the old and new key paths (must start with `/`, no spaces or special characters)
-- Decrypts the secrets file using the private key
-- Checks that the old key exists
-- Checks if the new key already exists and prompts for confirmation before overwriting
-- Moves the value from the old key to the new key
-- Removes the old key
-- Re-encrypts and saves the secrets file
-- Fails gracefully if the old key does not exist
-
-#### Example Usage
-
-```bash
-# Move a secret key to a new path
-$ crumb move /foo/bar /baz/bar
-Successfully moved key from /foo/bar to /baz/bar
-
-# Attempt to move a non-existent key
-$ crumb move /does/not/exist /new/path
-old key not found: /does/not/exist
-
-# Overwrite an existing key (with confirmation)
-$ crumb move /prod/api_key /test/api_key
-New key path '/test/api_key' already exists with value: testsecret
-key already exists. Overwrite? (y/n): y
-Successfully moved key from /prod/api_key to /test/api_key
-
-# Invalid key path
-$ crumb move invalid_key /new/path
-invalid old key path: key path must start with '/'
-```
 
 ### Import Command
 
@@ -488,10 +378,6 @@ crumb import --file <path-to-env-file> --path <destination-path>
 
 This command:
 - Parses a `.env` file to extract environment variables and their values
-- Validates the destination path (must start with `/`, no spaces or special characters)
-- Preserves the original case of environment variable names in storage paths
-- Detects conflicts with existing secrets and prompts for confirmation
-- Creates the destination path structure if it doesn't exist
 - Imports all variables as individual secrets under the specified path
 - Re-encrypts and saves the secrets file
 
@@ -508,13 +394,6 @@ EMPTY_VAR=
 QUOTED_VALUE='single-quoted-value'
 COMPLEX_URL=https://api.example.com?token=abc123&refresh=def456
 ```
-
-Supported features:
-- Comments (lines starting with `#`)
-- Empty lines (ignored)
-- Quoted values (both single and double quotes)
-- Values containing special characters and equals signs
-- Empty values
 
 #### Example Usage
 
@@ -594,6 +473,9 @@ Storage: /Users/username/.config/crumb/work-secrets (profile: work)
 # Check storage path for default profile
 $ crumb storage get
 Storage: /Users/username/.config/crumb/secrets (profile: default)
+
+# Override storage path for one command
+crumb --storage ~/backup-secrets ls
 ```
 
 #### Storage Clear
@@ -609,10 +491,9 @@ Example:
 # Clear custom storage path for work profile
 $ crumb --profile work storage clear
 Storage path cleared for profile: work (using default)
-
-# Verify it's using default path
-$ crumb --profile work storage get
-Storage: /Users/username/.config/crumb/secrets (profile: work)
+# Override storage path temporarily
+export CRUMB_STORAGE=~/temp-secrets
+crumb set /temp/key "temporary value"
 ```
 
 ## Profile Management
@@ -624,192 +505,17 @@ You can maintain separate secret stores for different contexts (work, personal, 
 ```bash
 # Set up different profiles
 crumb --profile work setup
-crumb --profile personal setup
-crumb --profile project-x setup
 
 # Add secrets to different profiles
 crumb --profile work set /api/key
 # Enter "work-secret" when prompted
-crumb --profile personal set /github/token
-# Enter "personal-token" when prompted
-crumb --profile project-x set /db/password
-# Enter "project-password" when prompted
 
 # List secrets by profile
 crumb --profile work ls
-crumb --profile personal ls
-crumb --profile project-x ls
-```
 
-### Using Environment Variables
-
-```bash
 # Set default profile via environment variable
 export CRUMB_PROFILE=work
 crumb ls  # Lists work profile secrets
-
-# Override storage path temporarily
-export CRUMB_STORAGE=~/temp-secrets
-crumb set /temp/key "temporary value"
-```
-
-### Command-line Overrides
-
-```bash
-# Use a specific profile for one command
-crumb --profile work get /api/key
-
-# Override storage path for one command
-crumb --storage ~/backup-secrets ls
-
-# Combine profile and storage overrides
-crumb --profile work --storage ~/work-backup get /api/key
-```
-
-## Practical Examples
-
-### Migrating from .env Files
-
-```bash
-# Existing project with .env file
-$ cat .env
-DATABASE_URL=postgresql://localhost/myapp
-API_KEY=abc123
-REDIS_URL=redis://localhost:6379
-SECRET_KEY=super-secret-key
-
-# Set up Crumb for the project
-crumb setup
-
-# Import all environment variables at once
-crumb import --file .env --path /myapp/config
-Found 4 environment variables in .env
-New keys to import: 4
-Successfully imported 4 secrets from .env to /myapp/config
-
-# Verify the import
-crumb ls /myapp/config
-/myapp/config/API_KEY
-/myapp/config/DATABASE_URL
-/myapp/config/REDIS_URL
-/myapp/config/SECRET_KEY
-
-# Create project configuration for easy exporting
-crumb init
-cat > .crumb.yaml << EOF
-version: "1.0"
-environments:
-  default:
-    path: "/myapp/config"
-    remap:
-      SECRET_KEY: "APP_SECRET_KEY"
-    env: {}
-EOF
-
-# Test the export (should match original .env vars)
-crumb export
-# Output:
-# export API_KEY=abc123
-# export DATABASE_URL=postgresql://localhost/myapp
-# export REDIS_URL=redis://localhost:6379
-# export APP_SECRET_KEY=super-secret-key
-
-# Now you can safely remove the .env file
-# rm .env
-
-# Use in development
-eval "$(crumb export)"
-echo $DATABASE_URL  # postgresql://localhost/myapp
-```
-
-### Work and Personal Separation
-
-```bash
-# Set up work profile with company SSH keys
-crumb --profile work setup
-# Enter work SSH key paths when prompted
-
-# Set up personal profile with personal SSH keys
-crumb --profile personal setup
-# Enter personal SSH key paths when prompted
-
-# Add work secrets
-crumb --profile work set /company/api-key
-# Enter work-secret-123 when prompted
-crumb --profile work set /company/db-password
-# Enter work-db-pass when prompted
-
-# Add personal secrets
-crumb --profile personal set /github/token
-# Enter ghp_personal123 when prompted
-crumb --profile personal set /aws/access-key
-# Enter personal-aws-key when prompted
-
-# List work secrets only
-crumb --profile work ls
-
-# List personal secrets only
-crumb --profile personal ls
-
-# Use environment variable for default profile
-export CRUMB_PROFILE=work
-crumb get /company/api-key  # Uses work profile
-
-# Export individual secrets for sourcing
-eval "$(crumb --profile work get --export /company/api-key)"
-eval "$(crumb --profile work get --export /company/db-password)"
-echo $COMPANY_API_KEY
-echo $COMPANY_DB_PASSWORD
-```
-
-### Project-Specific Storage
-
-```bash
-# Create a project-specific storage location
-crumb --profile project-alpha setup
-crumb --profile project-alpha storage set ~/projects/alpha/secrets
-
-# Add project secrets
-crumb --profile project-alpha set /alpha/api-key
-# Enter "alpha-secret" when prompted
-crumb --profile project-alpha set /alpha/db-url
-# Enter "postgres://alpha-db" when prompted
-
-# Create project config for easy exporting
-cd ~/projects/alpha
-crumb init
-
-# Edit .crumb.yaml to reference project secrets
-cat > .crumb.yaml << EOF
-version: "1.0"
-environments:
-  default:
-    path: "/alpha"
-    remap:
-      API_KEY: "ALPHA_API_KEY"
-      DB_URL: "ALPHA_DATABASE_URL"
-    env: {}
-EOF
-
-# Export project environment variables
-CRUMB_PROFILE=project-alpha crumb export
-```
-
-### Backup and Migration
-
-```bash
-# Create a backup of work secrets to a different location
-crumb --profile work --storage ~/backups/work-secrets-backup ls
-# This will show empty since backup doesn't exist yet
-
-# Copy secrets by exporting and re-importing (manual process)
-crumb --profile work ls  # Note the keys you want to backup
-
-# Temporarily use backup storage to set up new secrets
-crumb --profile work --storage ~/backups/work-secrets-backup set /api/key "$(crumb --profile work get --show /api/key)"
-
-# Switch work profile to use backup storage permanently
-crumb --profile work storage set ~/backups/work-secrets-backup
 ```
 
 ### Export Command
@@ -1030,26 +736,6 @@ environments:
     env:
       DATABASE_URL: "/staging/my-service/db/url"
 ```
-
-## Migration from Legacy Configuration
-
-If you have an existing configuration file with the old format:
-
-```yaml
-public_key_path: ~/.ssh/id_ed25519.pub
-private_key_path: ~/.ssh/id_ed25519
-```
-
-You need to migrate it to the new profile-based format. Run `crumb setup` to create a new profile-based configuration, or manually update your `~/.config/crumb/config.yaml` to:
-
-```yaml
-profiles:
-  default:
-    public_key_path: ~/.ssh/id_ed25519.pub
-    private_key_path: ~/.ssh/id_ed25519
-    storage: ~/.config/crumb/secrets
-```
-
 
 ## Development
 
