@@ -13,6 +13,13 @@
 
 but, designed for the non-enterprise developer without access to a cloud Secrets Manager, raft storage, etc. Crumb was born out of the need to be able to switch secrets between different projects, without leaving project secrets unencrypted on disk.
 
+## Features
+
+- **SSH Key Encryption/Decryption**: Securely encrypt your password strorage file using SSH Keys
+- **Bulk Export**: Explorts multiple secrets from a entire path like `/app/prod/`
+- **Multi-Profile Support**: Manage separate secret stores for work, personal, or different projects
+- **.env Import**: Import multiple secrets from `.env` files
+
 ## Installation
 
 1. Download and add binary to $PATH from https://github.com/crhuber/crumb/releases
@@ -24,27 +31,6 @@ OR
 ```bash
 kelp add crhuber/crumb --install
 ```
-
-## Features
-
-- **Multi-Profile Support**: Manage separate secret stores for work, personal, or different projects
-- **Custom Storage Paths**: Store secrets in different locations per profile
-- **Environment Variables**: Use `CRUMB_PROFILE` and `CRUMB_STORAGE` for easy integration
-- **Global Flags**: Override settings with `--profile` and `--storage` flags
-- **Storage Management**: Built-in commands to configure storage paths per profile
-- **Bulk Export**: Explorts multiple secrets from a entire path like `/app/prod/`
-- **.env Import**: Import multiple secrets from `.env` files with conflict detection and overwrite protection
-
-## Global Flags
-
-All commands support these global flags:
-
-- `--profile <name>`: Specify which profile to use (default: "default")
-- `--storage <path>`: Override storage file path for the current command
-
-Environment variables:
-- `CRUMB_PROFILE`: Set the default profile
-- `CRUMB_STORAGE`: Set the default storage path
 
 ## Usage
 
@@ -58,13 +44,10 @@ crumb setup [--profile <profile-name>]
 
 This command:
 - Creates a directory at `~/.config/crumb/` if it doesn't exist
+- Creates or updates `~/.config/crumb/config.yaml` with the profile configuration
 - Prompts for your SSH public key path (e.g., `~/.ssh/id_ed25519.pub`)
 - Prompts for your SSH private key path (e.g., `~/.ssh/id_ed25519`)
-- For non-default profiles, prompts for a custom storage file path
-- Validates that the provided keys are of type `ssh-rsa` or `ssh-ed25519`
-- Creates or updates `~/.config/crumb/config.yaml` with the profile configuration
 - Creates an empty encrypted secrets file at the specified storage location
-- Prompts for confirmation if files already exist
 
 #### Prerequisites
 
@@ -90,16 +73,43 @@ Config file: /Users/username/.config/crumb/config.yaml
 Storage file: /Users/username/.config/crumb/secrets
 ```
 
-**Work profile setup:**
+**Setup with non default profile**
 ```bash
 $ crumb --profile work setup
-Enter path to SSH public key (e.g., ~/.ssh/work.pub): ~/.ssh/work.pub
-Enter path to SSH private key (e.g., ~/.ssh/work): ~/.ssh/work
-Enter storage file path (e.g., ~/.config/crumb/secrets-work): ~/.config/crumb/work-secrets
-Setup completed successfully for profile 'work'!
-Config file: /Users/username/.config/crumb/config.yaml
-Storage file: /Users/username/.config/crumb/work-secrets
 ```
+
+
+### Set Command
+
+The `set` command adds or updates a secret key-value pair. The value is entered securely on a new line and is not echoed to the terminal or stored in shell history.
+
+```bash
+crumb set <key-path>
+```
+
+This command:
+- Validates the key path (must start with `/`, no spaces or special characters)
+- Decrypts the secrets file using the private key
+- Checks if the key already exists and prompts for confirmation if it does
+- Adds or updates the key-value pair
+- Re-encrypts and saves the secrets file
+
+#### Example Usage
+
+```bash
+# Add a new secret
+$ crumb set /prod/api_key
+Enter secret value: [secret not shown]
+Successfully set key: /prod/api_key
+
+# Update an existing secret (with confirmation)
+$ crumb set /prod/api_key
+Key '/prod/api_key' already exists.
+key already exists. Overwrite? (y/n): y
+Enter secret value: [secret not shown]
+Successfully set key: /prod/api_key
+```
+
 
 ### List Command
 
@@ -125,43 +135,7 @@ $ crumb ls
 $ crumb ls /prod
 /prod/api_key
 /prod/auth-svc/secret
-
-# Filter with partial matching
-$ crumb ls /any
-/any/other/mykey
-/any/path/mykey
 ```
-
-### Set Command
-
-The `set` command adds or updates a secret key-value pair. The value is entered securely on a new line and is not echoed to the terminal or stored in shell history.
-
-```bash
-crumb set <key-path>
-```
-
-This command:
-- Validates the key path (must start with `/`, no spaces or special characters)
-- Decrypts the secrets file using the private key
-- Checks if the key already exists and prompts for confirmation if it does
-- Prompts you to enter the secret value securely (not echoed to terminal)
-- Adds or updates the key-value pair
-- Re-encrypts and saves the secrets file
-
-#### Example Usage
-
-```bash
-# Add a new secret
-$ crumb set /prod/api_key
-Enter secret value: [secret not shown]
-Successfully set key: /prod/api_key
-
-# Update an existing secret (with confirmation)
-$ crumb set /prod/api_key
-Key '/prod/api_key' already exists.
-key already exists. Overwrite? (y/n): y
-Enter secret value: [secret not shown]
-Successfully set key: /prod/api_key
 
 
 ### Get Command
@@ -248,7 +222,7 @@ eval (crumb get /prod/ --export --shell fish)
 
 ### Init Command
 
-The `init` command creates a YAML configuration file in the current directory.
+The `init` command creates a YAML configuration file in the current project directory.
 
 ```bash
 crumb init
@@ -291,22 +265,15 @@ You can add additional environments for different deployment contexts:
 version: "1.0"
 environments:
   default:
-    path: "/dev/myapp"
+    path: "/myapp/dev"
     remap: {}
     env:
-      DATABASE_URL: "/dev/myapp/db_url"
-  staging:
-    path: "/staging/myapp"
-    remap:
-      API_KEY: "STAGING_API_KEY"
-    env:
-      DATABASE_URL: "/staging/myapp/db_url"
+      FOO: "bar"
   production:
-    path: "/prod/myapp"
+    path: "/myapp/prod"
     remap: {}
     env:
-      DATABASE_URL: "/prod/myapp/db_url"
-      API_SECRET: "/prod/myapp/secret"
+      FOO: "baz"
 ```
 
 #### Remapping Keys
@@ -425,10 +392,10 @@ $ crumb ls /dev/myapp
 ```bash
 # Import to work profile
 $ crumb --profile work import --file work.env --path /work/secrets
-Found 6 environment variables in work.env
-New keys to import: 6
-Successfully imported 6 secrets from work.env to /work/secrets
+```
 
+**Using with different storage location:**
+```bash
 # Import to custom storage location
 $ crumb --storage ~/project-secrets import --file project.env --path /project/config
 ```
@@ -533,24 +500,6 @@ crumb export [-f config-file] [--env environment] [--shell=bash|fish] [--profile
 crumb export --path <secret-path> [--shell=bash|fish] [--profile <profile-name>]
 ```
 
-**Config-based mode** (when no `--path` flag is provided):
-- Uses the specified profile (or default) for accessing secrets
-- Reads the `.crumb.yaml` configuration file from the current directory (or a custom path with `-f`)
-- Uses the specified environment (or "default" with `--env` flag)
-- Validates the YAML structure and paths
-- Decrypts the secrets file using the profile's private key and storage location
-- Processes the `path` section to export secrets matching a path prefix
-- Processes the `env` section to export individual secrets
-- Applies remapping from the `remap` section
-- Outputs in Bash (`export VAR=value`) or Fish (`set -x VAR value`) format
-- Includes comments for clarity
-
-**Direct path mode** (when `--path` flag is provided):
-- Bypasses the need for a `.crumb.yaml` configuration file
-- Exports all secrets that start with the specified path prefix
-- Converts secret paths to environment variable names by removing the prefix and transforming to uppercase with underscores
-- Perfect for quick exports without setting up configuration files
-
 #### Example Usage
 
 First, create a `.crumb.yaml` configuration file:
@@ -559,19 +508,17 @@ First, create a `.crumb.yaml` configuration file:
 version: "1.0"
 environments:
   default:
-    path: "/prod/billing-svc"
+    path: "/myapp/dev"
     remap:
-      VARS_MG: "MG_KEY"
-      VARS_STRIPE: "STRIPE_KEY"
+      DEFAULT_SECRET: "SECRET"
     env:
-      DATABASE_URL: "/prod/billing-svc/db/url"
-      API_SECRET: "/prod/billing-svc/api/secret"
+      MESSAGE: "Hello default"
   staging:
-    path: "/staging/billing-svc"
+    path: "/myapp/staging"
     remap:
-      VARS_MG: "STAGING_MG_KEY"
+      STAGING_SECRET: "SECRET"
     env:
-      DATABASE_URL: "/staging/billing-svc/db/url"
+      MESSAGE: "Hello staging"
 ```
 
 Then export the secrets:
@@ -579,17 +526,13 @@ Then export the secrets:
 ```bash
 # Export default environment for bash (default)
 $ crumb export
-# Exported from /prod/billing-svc (environment: default)
+# Exported from /myapp/dev (environment: default)
 export API_SECRET=secret123
-export DATABASE_URL=postgres://user:pass@localhost/db
-export MG_KEY=mgsecret
-export STRIPE_KEY=stripesecret
+export MESSAGE=Hello default
+export SECRET=somesecret
 
 # Export staging environment
 $ crumb export --env staging
-# Exported from /staging/billing-svc (environment: staging)
-export DATABASE_URL=postgres://staging-user:pass@staging-db/db
-export STAGING_MG_KEY=staging-mgsecret
 
 # Export for fish shell
 $ crumb export --shell fish
