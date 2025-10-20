@@ -148,16 +148,17 @@ No secrets found
 
 ### Set Command
 
-The `set` command adds or updates a secret key-value pair.
+The `set` command adds or updates a secret key-value pair. The value is entered securely on a new line and is not echoed to the terminal or stored in shell history.
 
 ```bash
-crumb set <key-path> <value>
+crumb set <key-path>
 ```
 
 This command:
 - Validates the key path (must start with `/`, no spaces or special characters)
 - Decrypts the secrets file using the private key
 - Checks if the key already exists and prompts for confirmation if it does
+- Prompts you to enter the secret value securely (not echoed to terminal)
 - Adds or updates the key-value pair
 - Re-encrypts and saves the secrets file
 
@@ -165,20 +166,22 @@ This command:
 
 ```bash
 # Add a new secret
-$ crumb set /prod/api_key secret123
+$ crumb set /prod/api_key
+Enter secret value: [secret not shown]
 Successfully set key: /prod/api_key
 
 # Update an existing secret (with confirmation)
-$ crumb set /prod/api_key newsecret456
-Key '/prod/api_key' already exists with value: secret123
+$ crumb set /prod/api_key
+Key '/prod/api_key' already exists.
 key already exists. Overwrite? (y/n): y
+Enter secret value: [secret not shown]
 Successfully set key: /prod/api_key
 
 # Invalid key path examples
-$ crumb set invalid_key value
+$ crumb set invalid_key
 Error: key path must start with '/'
 
-$ crumb set "/test/key with spaces" value
+$ crumb set "/test/key with spaces"
 Error: key path cannot contain spaces
 ```
 
@@ -625,9 +628,12 @@ crumb --profile personal setup
 crumb --profile project-x setup
 
 # Add secrets to different profiles
-crumb --profile work set /api/key "work-secret"
-crumb --profile personal set /github/token "personal-token"
-crumb --profile project-x set /db/password "project-password"
+crumb --profile work set /api/key
+# Enter "work-secret" when prompted
+crumb --profile personal set /github/token
+# Enter "personal-token" when prompted
+crumb --profile project-x set /db/password
+# Enter "project-password" when prompted
 
 # List secrets by profile
 crumb --profile work ls
@@ -728,12 +734,16 @@ crumb --profile personal setup
 # Enter personal SSH key paths when prompted
 
 # Add work secrets
-crumb --profile work set /company/api-key "work-secret-123"
-crumb --profile work set /company/db-password "work-db-pass"
+crumb --profile work set /company/api-key
+# Enter work-secret-123 when prompted
+crumb --profile work set /company/db-password
+# Enter work-db-pass when prompted
 
 # Add personal secrets
-crumb --profile personal set /github/token "ghp_personal123"
-crumb --profile personal set /aws/access-key "personal-aws-key"
+crumb --profile personal set /github/token
+# Enter ghp_personal123 when prompted
+crumb --profile personal set /aws/access-key
+# Enter personal-aws-key when prompted
 
 # List work secrets only
 crumb --profile work ls
@@ -760,8 +770,10 @@ crumb --profile project-alpha setup
 crumb --profile project-alpha storage set ~/projects/alpha/secrets
 
 # Add project secrets
-crumb --profile project-alpha set /alpha/api-key "alpha-secret"
-crumb --profile project-alpha set /alpha/db-url "postgres://alpha-db"
+crumb --profile project-alpha set /alpha/api-key
+# Enter "alpha-secret" when prompted
+crumb --profile project-alpha set /alpha/db-url
+# Enter "postgres://alpha-db" when prompted
 
 # Create project config for easy exporting
 cd ~/projects/alpha

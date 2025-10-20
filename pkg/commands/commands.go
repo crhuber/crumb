@@ -178,13 +178,12 @@ func ListCommand(_ context.Context, cmd *cli.Command) error {
 
 // SetCommand handles the set command
 func SetCommand(_ context.Context, cmd *cli.Command) error {
-	// Check arguments
-	if cmd.Args().Len() != 2 {
-		return fmt.Errorf("usage: crumb set <key-path> <value>")
+	// Check arguments - only key path is required
+	if cmd.Args().Len() != 1 {
+		return fmt.Errorf("usage: crumb set <key-path>")
 	}
 
 	keyPath := cmd.Args().Get(0)
-	value := cmd.Args().Get(1)
 
 	// Validate key path
 	if err := config.ValidateKeyPath(keyPath); err != nil {
@@ -208,12 +207,23 @@ func SetCommand(_ context.Context, cmd *cli.Command) error {
 	}
 
 	// Check if key exists and prompt for overwrite
-	if existingValue, exists := storage.SecretExists(secrets, keyPath); exists {
-		fmt.Printf("Key '%s' already exists with value: %s\n", keyPath, existingValue)
+	if _, exists := storage.SecretExists(secrets, keyPath); exists {
+		fmt.Printf("Key '%s' already exists.\n", keyPath)
 		if !crypto.ConfirmOverwrite("key") {
 			fmt.Println("Operation cancelled.")
 			return nil
 		}
+	}
+
+	// Prompt for the secret value (not echoed to terminal)
+	value, err := config.PromptForSecret("Enter secret value: ")
+	if err != nil {
+		return err
+	}
+
+	// Validate that value is not empty
+	if strings.TrimSpace(value) == "" {
+		return fmt.Errorf("secret value cannot be empty")
 	}
 
 	// Update the key-value pair
