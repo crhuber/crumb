@@ -7,7 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
+	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 )
 
@@ -227,4 +229,31 @@ func PromptForInput(prompt string) (string, error) {
 		return "", fmt.Errorf("failed to read input: %w", err)
 	}
 	return strings.TrimSpace(input), nil
+}
+
+// PromptForSecret prompts the user for secret input without echoing to terminal
+func PromptForSecret(prompt string) (string, error) {
+	fmt.Print(prompt)
+
+	// Check if stdin is a terminal
+	if !term.IsTerminal(int(syscall.Stdin)) {
+		// If not a TTY, read from stdin normally (for testing/scripting)
+		reader := bufio.NewReader(os.Stdin)
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return "", fmt.Errorf("failed to read input: %w", err)
+		}
+		return strings.TrimSpace(input), nil
+	}
+
+	// Read password without echoing
+	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
+	if err != nil {
+		return "", fmt.Errorf("failed to read input: %w", err)
+	}
+
+	// Print newline after input
+	fmt.Println()
+
+	return string(bytePassword), nil
 }
