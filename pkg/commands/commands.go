@@ -538,11 +538,19 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 		}
 
 		// Process env section
-		for envVarName, envVarPath := range envConfig.Env {
-			if secretValue, exists := storage.SecretExists(secrets, envVarPath); exists {
-				// Sanitize environment variable name
-				sanitizedEnvVarName := strings.ToUpper(strings.ReplaceAll(envVarName, "-", "_"))
-				envVars[sanitizedEnvVarName] = secretValue
+		for envVarName, envVarValue := range envConfig.Env {
+			// Sanitize environment variable name
+			sanitizedEnvVarName := strings.ToUpper(strings.ReplaceAll(envVarName, "-", "_"))
+
+			// If value starts with '/', treat it as a path to a secret
+			// Otherwise, use it as a literal value
+			if strings.HasPrefix(envVarValue, "/") {
+				if secretValue, exists := storage.SecretExists(secrets, envVarValue); exists {
+					envVars[sanitizedEnvVarName] = secretValue
+				}
+			} else {
+				// Use literal value directly
+				envVars[sanitizedEnvVarName] = envVarValue
 			}
 		}
 
