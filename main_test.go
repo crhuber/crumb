@@ -647,3 +647,163 @@ environments:
 		}
 	}
 }
+
+func TestExportCommandLiteralEnvValues(t *testing.T) {
+	tempDir := createTempDir(t)
+	defer os.RemoveAll(tempDir)
+
+	// Create test config with both literal values and path-based values
+	configPath := filepath.Join(tempDir, ".crumb.yaml")
+	configContent := `version: "1.0"
+environments:
+  default:
+    path: "/contacts/live"
+    remap:
+      JWT_KEY: "CONTACTS_JWT_KEY"
+      JWT_KEY_STATIC: "CONTACTS_JWT_KEY_STATIC"
+      DB_DSN: "CONTACTS_DB_DSN"
+    env:
+      DB_TYPE: "postgres"
+      DB_HOST: "localhost"
+      DB_PORT: "5432"
+  production:
+    path: "/contacts/prod"
+    remap: {}
+    env:
+      DB_TYPE: "mysql"
+      SECRET_PATH: "/contacts/prod/secret"`
+
+	err := os.WriteFile(configPath, []byte(configContent), 0600)
+	if err != nil {
+		t.Fatalf("Failed to create test config: %v", err)
+	}
+
+	// Test secrets map - only contains path-based secrets
+	secrets := map[string]string{
+		"/contacts/live/jwt-key":        "live-jwt-secret",
+		"/contacts/live/jwt-key-static": "live-jwt-static-secret",
+		"/contacts/live/db-dsn":         "postgres://live-db",
+		"/contacts/prod/secret":         "prod-secret-value",
+	}
+
+	// Load config
+	crumbConfig, err := config.LoadCrumbConfig(configPath)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Test default environment with literal values
+	t.Run("default environment with literal values", func(t *testing.T) {
+		envVars := make(map[string]string)
+
+		defaultEnv, exists := crumbConfig.Environments["default"]
+		if !exists {
+			t.Fatalf("Default environment not found")
+		}
+
+		// Process path section
+		if defaultEnv.Path != "" {
+			pathPrefix := strings.TrimSuffix(defaultEnv.Path, "/")
+			for secretPath, secretValue := range secrets {
+				if strings.HasPrefix(secretPath, pathPrefix) {
+					keyName := strings.TrimPrefix(secretPath, pathPrefix)
+					keyName = strings.TrimPrefix(keyName, "/")
+					keyName = strings.ToUpper(strings.ReplaceAll(keyName, "/", "_"))
+					keyName = strings.ReplaceAll(keyName, "-", "_")
+
+					if keyName != "" {
+						envVars[keyName] = secretValue
+					}
+				}
+			}
+		}
+
+		// Process env section with literal value support
+		for envVarName, envVarValue := range defaultEnv.Env {
+			sanitizedEnvVarName := strings.ToUpper(strings.ReplaceAll(envVarName, "-", "_"))
+
+			// If value starts with '/', treat it as a path to a secret
+			// Otherwise, use it as a literal value
+			if strings.HasPrefix(envVarValue, "/") {
+				if secretValue, exists := secrets[envVarValue]; exists {
+					envVars[sanitizedEnvVarName] = secretValue
+				}
+			} else {
+				// Use literal value directly
+				envVars[sanitizedEnvVarName] = envVarValue
+			}
+		}
+
+		// Apply remap mappings
+		for originalKey, newKey := range defaultEnv.Remap {
+			sanitizedOriginalKey := strings.ToUpper(strings.ReplaceAll(originalKey, "-", "_"))
+			sanitizedNewKey := strings.ToUpper(strings.ReplaceAll(newKey, "-", "_"))
+
+			if value, exists := envVars[sanitizedOriginalKey]; exists {
+				envVars[sanitizedNewKey] = value
+				delete(envVars, sanitizedOriginalKey)
+			}
+		}
+
+		// Verify expected variables
+		expectedVars := map[string]string{
+			"DB_TYPE":                 "postgres",  // Literal value
+			"DB_HOST":                 "localhost", // Literal value
+			"DB_PORT":                 "5432",      // Literal value
+			"CONTACTS_JWT_KEY":        "live-jwt-secret",
+			"CONTACTS_JWT_KEY_STATIC": "live-jwt-static-secret",
+			"CONTACTS_DB_DSN":         "postgres://live-db",
+		}
+
+		for expectedKey, expectedValue := range expectedVars {
+			if actualValue, exists := envVars[expectedKey]; !exists {
+				t.Errorf("Expected environment variable %q not found", expectedKey)
+			} else if actualValue != expectedValue {
+				t.Errorf("Environment variable %q: expected value %q, got %q", expectedKey, expectedValue, actualValue)
+			}
+		}
+
+		// Verify we have the right number of vars (no extras)
+		if len(envVars) != len(expectedVars) {
+			t.Errorf("Expected %d environment variables, got %d", len(expectedVars), len(envVars))
+			t.Logf("Actual vars: %+v", envVars)
+		}
+	})
+
+	// Test production environment with mixed literal and path values
+	t.Run("production environment with mixed values", func(t *testing.T) {
+		envVars := make(map[string]string)
+
+		prodEnv, exists := crumbConfig.Environments["production"]
+		if !exists {
+			t.Fatalf("Production environment not found")
+		}
+
+		// Process env section
+		for envVarName, envVarValue := range prodEnv.Env {
+			sanitizedEnvVarName := strings.ToUpper(strings.ReplaceAll(envVarName, "-", "_"))
+
+			if strings.HasPrefix(envVarValue, "/") {
+				if secretValue, exists := secrets[envVarValue]; exists {
+					envVars[sanitizedEnvVarName] = secretValue
+				}
+			} else {
+				envVars[sanitizedEnvVarName] = envVarValue
+			}
+		}
+
+		// Verify expected variables
+		expectedVars := map[string]string{
+			"DB_TYPE":     "mysql",             // Literal value
+			"SECRET_PATH": "prod-secret-value", // Path-based value
+		}
+
+		for expectedKey, expectedValue := range expectedVars {
+			if actualValue, exists := envVars[expectedKey]; !exists {
+				t.Errorf("Expected environment variable %q not found", expectedKey)
+			} else if actualValue != expectedValue {
+				t.Errorf("Environment variable %q: expected value %q, got %q", expectedKey, expectedValue, actualValue)
+			}
+		}
+	})
+}
