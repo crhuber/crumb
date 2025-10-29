@@ -568,8 +568,10 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 	}
 
 	// Generate shell output
+	// Note: We don't error when no secrets are found, as this is expected
+	// when using hooks in directories without matching secrets
 	if len(envVars) == 0 {
-		return fmt.Errorf("no secrets found to export")
+		return nil
 	}
 
 	// Sort keys for consistent output
