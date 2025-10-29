@@ -225,8 +225,7 @@ func TestExportWithMatchingSecrets(t *testing.T) {
 		Action: commands.ExportCommand,
 	}
 
-	var cmdErr error
-	cmdErr = cmd.Run(context.Background(), []string{"export"})
+	cmdErr := cmd.Run(context.Background(), []string{"export"})
 
 	w.Close()
 	os.Stdout = oldStdout

@@ -569,7 +569,9 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 
 	// Generate shell output
 	// Note: We don't error when no secrets are found, as this is expected
-	// when using hooks in directories without matching secrets
+	// when using hooks in directories without matching secrets. Hook scripts
+	// suppress errors with 2>/dev/null, so returning an error would cause
+	// silent failures where no environment variables are exported.
 	if len(envVars) == 0 {
 		return nil
 	}
