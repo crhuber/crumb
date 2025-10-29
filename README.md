@@ -16,7 +16,7 @@ but, designed for the non-enterprise developer without access to a cloud Secrets
 ## Features
 
 - **SSH Key Encryption/Decryption**: Securely encrypt your password strorage file using SSH Keys
-- **Bulk Export**: Explorts multiple secrets from a entire path like `/app/prod/`
+- **Bulk Export**: Exports multiple secrets from a entire path like `/app/prod/`
 - **Multi-Profile Support**: Manage separate secret stores for work, personal, or different projects
 - **.env Import**: Import multiple secrets from `.env` files
 - **Shell Integration**: Automatic secret loading with shell hooks (bash, zsh, fish)
