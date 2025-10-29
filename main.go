@@ -145,6 +145,12 @@ func main() {
 				Action: commands.ExportCommand,
 			},
 			{
+				Name:      "hook",
+				Usage:     "Output shell hook script for automatic secret loading",
+				ArgsUsage: "<shell>",
+				Action:    commands.HookCommand,
+			},
+			{
 				Name:  "storage",
 				Usage: "Manage storage file configuration",
 				Commands: []*cli.Command{
