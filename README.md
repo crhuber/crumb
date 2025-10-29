@@ -19,6 +19,7 @@ but, designed for the non-enterprise developer without access to a cloud Secrets
 - **Bulk Export**: Explorts multiple secrets from a entire path like `/app/prod/`
 - **Multi-Profile Support**: Manage separate secret stores for work, personal, or different projects
 - **.env Import**: Import multiple secrets from `.env` files
+- **Shell Integration**: Automatic secret loading with shell hooks (bash, zsh, fish)
 
 ## Installation
 
@@ -601,6 +602,89 @@ $ eval "$(crumb export --path /api)"
 - Hyphens in the secret name are converted to underscores, and the result is uppercase
 mgsecret
 
+
+### Hook Command
+
+The `hook` command generates shell integration scripts that automatically load secrets when you enter a directory containing a `.crumb.yaml` file. This provides seamless, automatic environment variable management similar to direnv.
+
+```bash
+crumb hook <shell>
+```
+
+Supported shells:
+- `bash`
+- `zsh`
+- `fish`
+
+#### Setup Instructions
+
+Add the following to your shell's configuration file:
+
+**Bash** (`~/.bashrc` or `~/.bash_profile`):
+```bash
+eval "$(crumb hook bash)"
+```
+
+**Zsh** (`~/.zshrc`):
+```bash
+eval "$(crumb hook zsh)"
+```
+
+**Fish** (`~/.config/fish/config.fish`):
+```fish
+crumb hook fish | source
+```
+
+#### How It Works
+
+Once the hook is installed:
+
+1. When you enter a directory containing a `.crumb.yaml` file, the hook automatically runs `crumb export`
+2. The secrets defined in `.crumb.yaml` are loaded as environment variables
+3. When you leave the directory, the environment variables remain (they are not automatically unloaded)
+
+#### Example Workflow
+
+```bash
+# 1. Create a project with secrets
+$ mkdir myproject && cd myproject
+$ crumb init
+
+# 2. Edit .crumb.yaml to configure your secrets
+$ cat > .crumb.yaml << EOF
+version: "1.0"
+environments:
+  default:
+    path: "/myproject/dev"
+    env: {}
+    remap: {}
+EOF
+
+# 3. Add some secrets to crumb
+$ crumb set /myproject/dev/API_KEY
+Enter secret value: ********
+
+$ crumb set /myproject/dev/DATABASE_URL
+Enter secret value: ********
+
+# 4. With the hook installed, cd into the directory
+$ cd myproject
+# Secrets are automatically loaded!
+
+$ echo $API_KEY
+your-api-key-value
+
+$ echo $DATABASE_URL
+your-database-url
+```
+
+#### Notes
+
+- The hook checks for `.crumb.yaml` in the current directory only (not parent directories)
+- Errors from `crumb export` are silently suppressed (redirected to `/dev/null`)
+- The hook preserves the exit status of the previous command (important for bash prompt functions)
+- For bash/zsh, the hook runs on each prompt display and directory change
+- For fish, the hook runs on PWD changes and prompt events
 
 
 ## Configuration

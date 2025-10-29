@@ -16,7 +16,7 @@ func HookCommand(_ context.Context, cmd *cli.Command) error {
 	}
 
 	shell := cmd.Args().Get(0)
-	
+
 	// Get the path to the crumb binary
 	selfPath, err := os.Executable()
 	if err != nil {
