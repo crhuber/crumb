@@ -1,0 +1,161 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/urfave/cli/v3"
+
+	"crumb/pkg/commands"
+)
+
+func TestHookCommandIntegration(t *testing.T) {
+	tests := []struct {
+		name          string
+		shell         string
+		wantContains  []string
+		wantError     bool
+		errorContains string
+	}{
+		{
+			name:  "bash hook output",
+			shell: "bash",
+			wantContains: []string{
+				"_crumb_hook()",
+				"if [ -f .crumb.yaml ]",
+				"export --shell bash",
+				"PROMPT_COMMAND",
+			},
+			wantError: false,
+		},
+		{
+			name:  "zsh hook output",
+			shell: "zsh",
+			wantContains: []string{
+				"_crumb_hook()",
+				"if [ -f .crumb.yaml ]",
+				"export --shell bash",
+				"precmd_functions",
+				"chpwd_functions",
+			},
+			wantError: false,
+		},
+		{
+			name:  "fish hook output",
+			shell: "fish",
+			wantContains: []string{
+				"function _crumb_hook",
+				"if test -f .crumb.yaml",
+				"export --shell fish",
+				"--on-variable PWD",
+				"--on-event fish_prompt",
+			},
+			wantError: false,
+		},
+		{
+			name:          "unsupported shell",
+			shell:         "powershell",
+			wantError:     true,
+			errorContains: "unsupported shell",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Capture stdout
+			var buf bytes.Buffer
+			oldStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+
+			// Create a mock command
+			cmd := &cli.Command{
+				Name:   "hook",
+				Action: commands.HookCommand,
+			}
+
+			// Build arguments
+			args := []string{"hook"}
+			if tt.shell != "" {
+				args = append(args, tt.shell)
+			}
+
+			// Execute command
+			err := cmd.Run(context.Background(), args)
+
+			// Restore stdout
+			w.Close()
+			os.Stdout = oldStdout
+
+			// Read captured output
+			buf.ReadFrom(r)
+			output := buf.String()
+
+			// Check error expectation
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+					return
+				}
+				if tt.errorContains != "" && !strings.Contains(err.Error(), tt.errorContains) {
+					t.Errorf("expected error to contain %q, got: %v", tt.errorContains, err)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v, output: %s", err, output)
+				return
+			}
+
+			// Check that output contains expected strings
+			for _, want := range tt.wantContains {
+				if !strings.Contains(output, want) {
+					t.Errorf("output missing expected string %q\nGot output:\n%s", want, output)
+				}
+			}
+		})
+	}
+}
+
+func TestHookCommandExecutablePath(t *testing.T) {
+	// Capture stdout
+	var buf bytes.Buffer
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// Create a mock command
+	cmd := &cli.Command{
+		Name:   "hook",
+		Action: commands.HookCommand,
+	}
+
+	// Execute command
+	err := cmd.Run(context.Background(), []string{"hook", "bash"})
+
+	// Restore stdout
+	w.Close()
+	os.Stdout = oldStdout
+
+	// Read captured output
+	buf.ReadFrom(r)
+	output := buf.String()
+
+	if err != nil {
+		t.Fatalf("failed to run hook command: %v", err)
+	}
+
+	// The output should contain a reference to the crumb executable
+	if !strings.Contains(output, "crumb") {
+		t.Errorf("hook output should reference crumb executable, got: %s", output)
+	}
+
+	// Should contain the export command
+	if !strings.Contains(output, "export --shell bash") {
+		t.Errorf("hook output should contain export command, got: %s", output)
+	}
+}
