@@ -84,7 +84,7 @@ end
 
 function _crumb_hook_prompt --on-event fish_prompt --description 'crumb hook on prompt'
   if test -f .crumb.yaml
-	%s export --shell fish | source;
+    %s export --shell fish | source;
   end
 end
 `, selfPath, selfPath)
