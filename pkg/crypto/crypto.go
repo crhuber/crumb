@@ -181,8 +181,8 @@ func ConfirmOverwrite(item string) bool {
 	defer term.Restore(int(syscall.Stdin), oldState)
 
 	var response [1]byte
-	_, err = os.Stdin.Read(response[:])
-	if err != nil {
+	n, err := os.Stdin.Read(response[:])
+	if err != nil || n == 0 {
 		return false
 	}
 
