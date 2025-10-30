@@ -180,13 +180,17 @@ func ConfirmOverwrite(item string) bool {
 	}
 	defer term.Restore(int(syscall.Stdin), oldState)
 
-	var response [1]byte
-	n, err := os.Stdin.Read(response[:])
-	if err != nil || n == 0 {
+	response := make([]byte, 1)
+	n, err := os.Stdin.Read(response)
+	if err != nil || n != 1 {
 		return false
 	}
 
 	fmt.Println() // Print newline after the character
 
-	return response[0] == 'y' || response[0] == 'Y'
+	// Explicitly check bounds to satisfy gosec
+	if len(response) >= 1 {
+		return response[0] == 'y' || response[0] == 'Y'
+	}
+	return false
 }
