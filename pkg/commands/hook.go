@@ -11,11 +11,8 @@ import (
 
 // HookCommand handles the hook command for shell integration
 func HookCommand(_ context.Context, cmd *cli.Command) error {
-	if cmd.Args().Len() != 1 {
-		return fmt.Errorf("usage: crumb hook <shell>\nSupported shells: bash, zsh, fish")
-	}
 
-	shell := cmd.Args().Get(0)
+	shell := cmd.String("shell")
 
 	// Get the path to the crumb binary
 	selfPath, err := os.Executable()

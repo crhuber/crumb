@@ -148,7 +148,14 @@ func main() {
 				Name:      "hook",
 				Usage:     "Output shell hook script for automatic secret loading",
 				ArgsUsage: "<shell>",
-				Action:    commands.HookCommand,
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "shell",
+						Usage: "Shell format (bash, zsh or fish)",
+						Value: "bash",
+					},
+				},
+				Action: commands.HookCommand,
 			},
 			{
 				Name:  "storage",

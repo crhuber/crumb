@@ -622,17 +622,17 @@ Add the following to your shell's configuration file:
 
 **Bash** (`~/.bashrc` or `~/.bash_profile`):
 ```bash
-eval "$(crumb hook bash)"
+eval "$(crumb hook --shell bash)"
 ```
 
 **Zsh** (`~/.zshrc`):
 ```bash
-eval "$(crumb hook zsh)"
+eval "$(crumb hook --shell zsh)"
 ```
 
 **Fish** (`~/.config/fish/config.fish`):
 ```fish
-crumb hook fish | source
+crumb hook --shell fish | source
 ```
 
 #### How It Works
