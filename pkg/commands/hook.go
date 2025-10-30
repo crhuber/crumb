@@ -78,13 +78,13 @@ fi
 func fishHook(selfPath string) string {
 	return fmt.Sprintf(`function _crumb_hook --on-variable PWD --description 'crumb hook'
   if test -f .crumb.yaml
-    eval "$(%s export --shell fish)"
+    %s export --shell fish | source;
   end
 end
 
 function _crumb_hook_prompt --on-event fish_prompt --description 'crumb hook on prompt'
   if test -f .crumb.yaml
-    eval "$(%s export --shell fish)"
+	%s export --shell fish | source;
   end
 end
 `, selfPath, selfPath)
