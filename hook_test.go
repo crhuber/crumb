@@ -52,6 +52,7 @@ func TestHookCommandIntegration(t *testing.T) {
 				"export --shell fish",
 				"--on-variable PWD",
 				"--on-event fish_prompt",
+				"_crumb_hook",
 			},
 			wantError: false,
 		},
@@ -222,5 +223,10 @@ func TestFishHookNoTabCharacters(t *testing.T) {
 
 	if !strings.Contains(output, "function _crumb_hook_prompt --on-event fish_prompt") {
 		t.Errorf("Fish hook should contain prompt event handler")
+	}
+
+	// Verify the hook calls _crumb_hook immediately
+	if !strings.Contains(output, "_crumb_hook") {
+		t.Errorf("Fish hook should call _crumb_hook immediately after definition")
 	}
 }
