@@ -71,16 +71,23 @@ func TestHookCommandIntegration(t *testing.T) {
 			r, w, _ := os.Pipe()
 			os.Stdout = w
 
-			// Create a mock command
+			// Create a mock command with the shell flag
 			cmd := &cli.Command{
 				Name:   "hook",
 				Action: commands.HookCommand,
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "shell",
+						Usage: "Shell format (bash, zsh or fish)",
+						Value: "bash",
+					},
+				},
 			}
 
 			// Build arguments
 			args := []string{"hook"}
 			if tt.shell != "" {
-				args = append(args, tt.shell)
+				args = append(args, "--shell", tt.shell)
 			}
 
 			// Execute command
@@ -128,14 +135,21 @@ func TestHookCommandExecutablePath(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	// Create a mock command
+	// Create a mock command with the shell flag
 	cmd := &cli.Command{
 		Name:   "hook",
 		Action: commands.HookCommand,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "shell",
+				Usage: "Shell format (bash, zsh or fish)",
+				Value: "bash",
+			},
+		},
 	}
 
 	// Execute command
-	err := cmd.Run(context.Background(), []string{"hook", "bash"})
+	err := cmd.Run(context.Background(), []string{"hook", "--shell", "bash"})
 
 	// Restore stdout
 	w.Close()
