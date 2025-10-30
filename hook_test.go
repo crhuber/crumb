@@ -173,3 +173,54 @@ func TestHookCommandExecutablePath(t *testing.T) {
 		t.Errorf("hook output should contain export command, got: %s", output)
 	}
 }
+
+func TestFishHookNoTabCharacters(t *testing.T) {
+	// Capture stdout
+	var buf bytes.Buffer
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// Create a mock command with the shell flag
+	cmd := &cli.Command{
+		Name:   "hook",
+		Action: commands.HookCommand,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "shell",
+				Usage: "Shell format (bash, zsh or fish)",
+				Value: "bash",
+			},
+		},
+	}
+
+	// Execute command
+	err := cmd.Run(context.Background(), []string{"hook", "--shell", "fish"})
+
+	// Restore stdout
+	w.Close()
+	os.Stdout = oldStdout
+
+	// Read captured output
+	buf.ReadFrom(r)
+	output := buf.String()
+
+	if err != nil {
+		t.Fatalf("failed to run hook command: %v", err)
+	}
+
+	// Fish hook should not contain any tab characters
+	// Tab characters can cause issues with Fish shell parsing
+	if strings.Contains(output, "\t") {
+		t.Errorf("Fish hook output should not contain tab characters, found tabs in output")
+	}
+
+	// Verify the hook contains both expected functions
+	if !strings.Contains(output, "function _crumb_hook --on-variable PWD") {
+		t.Errorf("Fish hook should contain PWD change handler")
+	}
+
+	if !strings.Contains(output, "function _crumb_hook_prompt --on-event fish_prompt") {
+		t.Errorf("Fish hook should contain prompt event handler")
+	}
+}
