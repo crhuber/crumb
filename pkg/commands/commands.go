@@ -288,7 +288,7 @@ func GetCommand(_ context.Context, cmd *cli.Command) error {
 			fmt.Printf("export %s=%s\n", varName, quotedValue)
 		case "fish":
 			quotedValue := storage.ShellQuoteValue(value)
-			fmt.Printf("set -x %s %s\n", varName, quotedValue)
+			fmt.Printf("set -x -g%s %s\n", varName, quotedValue)
 		default:
 			return fmt.Errorf("unsupported shell format: %s (supported: bash, fish)", shell)
 		}
@@ -588,7 +588,7 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 			fmt.Printf("export %s=%s\n", key, quotedValue)
 		case "fish":
 			quotedValue := storage.ShellQuoteValue(value)
-			fmt.Printf("set -x %s %s\n", key, quotedValue)
+			fmt.Printf("set -x -g %s %s\n", key, quotedValue)
 		}
 	}
 

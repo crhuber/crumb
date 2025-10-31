@@ -87,5 +87,8 @@ function _crumb_hook_prompt --on-event fish_prompt --description 'crumb hook on 
     %s export --shell fish | source;
   end
 end
+
+# Call hook immediately to load secrets in current directory
+_crumb_hook
 `, selfPath, selfPath)
 }
