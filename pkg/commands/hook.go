@@ -43,8 +43,12 @@ func HookCommand(_ context.Context, cmd *cli.Command) error {
 func bashHook(selfPath string) string {
 	return fmt.Sprintf(`_crumb_hook() {
   local previous_exit_status=$?;
-  if [ -f .crumb.yaml ]; then
-    eval "$("%s" export --shell bash)";
+  # Only run if directory changed
+  if [[ "$PWD" != "$_CRUMB_LAST_DIR" ]]; then
+    _CRUMB_LAST_DIR="$PWD"
+    if [ -f .crumb.yaml ]; then
+      eval "$("%s" export --shell bash)";
+    fi
   fi
   return $previous_exit_status;
 };
@@ -64,10 +68,6 @@ func zshHook(selfPath string) string {
     eval "$("%s" export --shell bash)"
   fi
 }
-typeset -ag precmd_functions
-if (( ! ${precmd_functions[(I)_crumb_hook]} )); then
-  precmd_functions=(_crumb_hook $precmd_functions)
-fi
 typeset -ag chpwd_functions
 if (( ! ${chpwd_functions[(I)_crumb_hook]} )); then
   chpwd_functions=(_crumb_hook $chpwd_functions)
@@ -82,13 +82,7 @@ func fishHook(selfPath string) string {
   end
 end
 
-function _crumb_hook_prompt --on-event fish_prompt --description 'crumb hook on prompt'
-  if test -f .crumb.yaml
-    %s export --shell fish | source;
-  end
-end
-
 # Call hook immediately to load secrets in current directory
 _crumb_hook
-`, selfPath, selfPath)
+`, selfPath)
 }

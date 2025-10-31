@@ -38,7 +38,6 @@ func TestHookCommandIntegration(t *testing.T) {
 				"_crumb_hook()",
 				"if [ -f .crumb.yaml ]",
 				"export --shell bash",
-				"precmd_functions",
 				"chpwd_functions",
 			},
 			wantError: false,
@@ -51,7 +50,6 @@ func TestHookCommandIntegration(t *testing.T) {
 				"if test -f .crumb.yaml",
 				"export --shell fish",
 				"--on-variable PWD",
-				"--on-event fish_prompt",
 				"_crumb_hook",
 			},
 			wantError: false,
@@ -216,13 +214,14 @@ func TestFishHookNoTabCharacters(t *testing.T) {
 		t.Errorf("Fish hook output should not contain tab characters, found tabs in output")
 	}
 
-	// Verify the hook contains both expected functions
+	// Verify the hook contains the PWD change handler
 	if !strings.Contains(output, "function _crumb_hook --on-variable PWD") {
 		t.Errorf("Fish hook should contain PWD change handler")
 	}
 
-	if !strings.Contains(output, "function _crumb_hook_prompt --on-event fish_prompt") {
-		t.Errorf("Fish hook should contain prompt event handler")
+	// Verify the hook does NOT contain the prompt event handler (should only run on directory change)
+	if strings.Contains(output, "function _crumb_hook_prompt --on-event fish_prompt") {
+		t.Errorf("Fish hook should NOT contain prompt event handler - should only run on directory change")
 	}
 
 	// Verify the hook calls _crumb_hook immediately
@@ -279,6 +278,101 @@ func TestHookOutputSilent(t *testing.T) {
 			// Verify that the export command is still present (functionality preserved)
 			if !strings.Contains(output, "export --shell") {
 				t.Errorf("%s hook should still contain export command, got: %s", shell, output)
+			}
+		})
+	}
+}
+
+func TestHookOnlyRunsOnDirectoryChange(t *testing.T) {
+	tests := []struct {
+		name             string
+		shell            string
+		shouldNotContain []string
+		shouldContain    []string
+	}{
+		{
+			name:  "bash hook only runs on directory change",
+			shell: "bash",
+			shouldContain: []string{
+				"_CRUMB_LAST_DIR",              // Tracks previous directory
+				"$PWD\" != \"$_CRUMB_LAST_DIR", // Compares current vs last directory
+			},
+			shouldNotContain: []string{
+				// Bash uses PROMPT_COMMAND but with directory tracking, so no specific anti-pattern
+			},
+		},
+		{
+			name:  "zsh hook only runs on directory change",
+			shell: "zsh",
+			shouldContain: []string{
+				"chpwd_functions", // Directory change hook
+			},
+			shouldNotContain: []string{
+				"precmd_functions", // Should NOT use prompt hook
+			},
+		},
+		{
+			name:  "fish hook only runs on directory change",
+			shell: "fish",
+			shouldContain: []string{
+				"--on-variable PWD", // Directory change trigger
+			},
+			shouldNotContain: []string{
+				"--on-event fish_prompt", // Should NOT use prompt event
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Capture stdout
+			var buf bytes.Buffer
+			oldStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+
+			// Create a mock command with the shell flag
+			cmd := &cli.Command{
+				Name:   "hook",
+				Action: commands.HookCommand,
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "shell",
+						Usage: "Shell format (bash, zsh or fish)",
+						Value: "bash",
+					},
+				},
+			}
+
+			// Execute command
+			err := cmd.Run(context.Background(), []string{"hook", "--shell", tt.shell})
+
+			// Restore stdout
+			w.Close()
+			os.Stdout = oldStdout
+
+			// Read captured output
+			buf.ReadFrom(r)
+			output := buf.String()
+
+			if err != nil {
+				t.Fatalf("failed to run hook command: %v", err)
+			}
+
+			// Verify required patterns are present
+			for _, pattern := range tt.shouldContain {
+				if !strings.Contains(output, pattern) {
+					t.Errorf("%s hook missing required pattern %q for directory-change-only behavior\nGot output:\n%s",
+						tt.shell, pattern, output)
+				}
+			}
+
+			// Verify unwanted patterns are absent
+			for _, pattern := range tt.shouldNotContain {
+				if strings.Contains(output, pattern) {
+					t.Errorf("%s hook should NOT contain %q (would cause execution on every prompt)\nGot output:\n%s",
+						tt.shell, pattern, output)
+				}
 			}
 		})
 	}
