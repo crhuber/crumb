@@ -230,3 +230,56 @@ func TestFishHookNoTabCharacters(t *testing.T) {
 		t.Errorf("Fish hook should call _crumb_hook immediately after definition")
 	}
 }
+
+func TestHookOutputSilent(t *testing.T) {
+	shells := []string{"bash", "zsh", "fish"}
+
+	for _, shell := range shells {
+		t.Run(shell, func(t *testing.T) {
+			// Capture stdout
+			var buf bytes.Buffer
+			oldStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+
+			// Create a mock command with the shell flag
+			cmd := &cli.Command{
+				Name:   "hook",
+				Action: commands.HookCommand,
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "shell",
+						Usage: "Shell format (bash, zsh or fish)",
+						Value: "bash",
+					},
+				},
+			}
+
+			// Execute command
+			err := cmd.Run(context.Background(), []string{"hook", "--shell", shell})
+
+			// Restore stdout
+			w.Close()
+			os.Stdout = oldStdout
+
+			// Read captured output
+			buf.ReadFrom(r)
+			output := buf.String()
+
+			if err != nil {
+				t.Fatalf("failed to run hook command: %v", err)
+			}
+
+			// Verify the hook does NOT contain echo statements for "Loading crumb secrets..."
+			// This ensures the hooks run silently without printing messages to the terminal
+			if strings.Contains(output, "Loading crumb secrets") {
+				t.Errorf("%s hook should not contain 'Loading crumb secrets' message, found in output:\n%s", shell, output)
+			}
+
+			// Verify that the export command is still present (functionality preserved)
+			if !strings.Contains(output, "export --shell") {
+				t.Errorf("%s hook should still contain export command, got: %s", shell, output)
+			}
+		})
+	}
+}
