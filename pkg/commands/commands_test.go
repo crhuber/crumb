@@ -85,15 +85,36 @@ func TestComputeEnvDiff(t *testing.T) {
 				t.Errorf("computeEnvDiff() = %q, want %q", result, tt.expectedDiff)
 			}
 
-			// Additional validation: check that result parts are sorted
+			// Additional validation: check that variables are sorted within their category
 			if result != "" {
 				parts := strings.Split(result, " ")
-				for i := 1; i < len(parts); i++ {
-					// Strip the +/~ prefix for comparison
-					prev := parts[i-1][1:]
-					curr := parts[i][1:]
-					if prev > curr && parts[i-1][0] == parts[i][0] {
-						t.Errorf("Result is not sorted: %q", result)
+
+				// Group by prefix
+				addedVars := []string{}
+				modifiedVars := []string{}
+
+				for _, part := range parts {
+					if len(part) > 0 {
+						if part[0] == '+' {
+							addedVars = append(addedVars, part[1:])
+						} else if part[0] == '~' {
+							modifiedVars = append(modifiedVars, part[1:])
+						}
+					}
+				}
+
+				// Check that added vars are sorted
+				for i := 1; i < len(addedVars); i++ {
+					if addedVars[i-1] > addedVars[i] {
+						t.Errorf("Added variables are not sorted: %v", addedVars)
+						break
+					}
+				}
+
+				// Check that modified vars are sorted
+				for i := 1; i < len(modifiedVars); i++ {
+					if modifiedVars[i-1] > modifiedVars[i] {
+						t.Errorf("Modified variables are not sorted: %v", modifiedVars)
 						break
 					}
 				}
