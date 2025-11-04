@@ -442,6 +442,50 @@ func MoveCommand(_ context.Context, cmd *cli.Command) error {
 	return nil
 }
 
+// computeEnvDiff compares current environment with new variables and returns a formatted diff string
+func computeEnvDiff(newVars map[string]string) string {
+	var added []string
+	var modified []string
+
+	// Get current environment
+	currentEnv := make(map[string]string)
+	for _, envVar := range os.Environ() {
+		parts := strings.SplitN(envVar, "=", 2)
+		if len(parts) == 2 {
+			currentEnv[parts[0]] = parts[1]
+		}
+	}
+
+	// Compare new vars with current environment
+	for key, newValue := range newVars {
+		if currentValue, exists := currentEnv[key]; exists {
+			// Variable exists - check if modified
+			if currentValue != newValue {
+				modified = append(modified, key)
+			}
+			// If value is the same, we don't show it in the diff
+		} else {
+			// New variable being added
+			added = append(added, key)
+		}
+	}
+
+	// Sort for consistent output
+	sort.Strings(added)
+	sort.Strings(modified)
+
+	// Build the diff string
+	var parts []string
+	for _, key := range added {
+		parts = append(parts, "+"+key)
+	}
+	for _, key := range modified {
+		parts = append(parts, "~"+key)
+	}
+
+	return strings.Join(parts, " ")
+}
+
 // ExportCommand handles the export command
 func ExportCommand(_ context.Context, cmd *cli.Command) error {
 	// Get shell format (default to bash)
@@ -570,6 +614,12 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 	// Generate shell output
 	if len(envVars) == 0 {
 		return fmt.Errorf("no secrets found to export")
+	}
+
+	// Compute and print the environment diff status to stderr
+	diffStatus := computeEnvDiff(envVars)
+	if diffStatus != "" {
+		fmt.Fprintf(os.Stderr, "crumb: export %s\n", diffStatus)
 	}
 
 	// Sort keys for consistent output
