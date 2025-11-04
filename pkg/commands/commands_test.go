@@ -95,9 +95,10 @@ func TestComputeEnvDiff(t *testing.T) {
 
 				for _, part := range parts {
 					if len(part) > 0 {
-						if part[0] == '+' {
+						switch part[0] {
+						case '+':
 							addedVars = append(addedVars, part[1:])
-						} else if part[0] == '~' {
+						case '~':
 							modifiedVars = append(modifiedVars, part[1:])
 						}
 					}

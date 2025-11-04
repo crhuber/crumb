@@ -550,7 +550,7 @@ func TestExportCommandDiffOutput(t *testing.T) {
 	// This test verifies that the export command outputs a diff status to stderr
 	// The actual output format should be: "crumb: export +VAR1 +VAR2 ~VAR3"
 
-	t.Run("diff output format", func(t *testing.T) {
+	t.Run("diff output format", func(_ *testing.T) {
 		// We can't easily test the full export command without setting up
 		// SSH keys and storage, but we can verify the diff computation logic
 		// through the unit tests in commands_test.go
