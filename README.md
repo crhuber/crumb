@@ -715,6 +715,40 @@ Each profile has its own encrypted storage file:
 - Default profile: `~/.config/crumb/secrets` (unless customized)
 - Named profiles: Configurable per profile (e.g., `~/.config/crumb/work-secrets`)
 
+### User Preferences (Optional)
+
+`~/.config/crumb/crumb.toml` - Optional TOML configuration file for user preferences.
+
+**Shell configuration:**
+```toml
+# Specifies the default shell format for get, export, and hook commands
+# Supported values: "bash", "fish", "zsh"
+# Default: "bash"
+shell = "bash"
+```
+
+This allows you to set a default shell format without specifying `--shell` on every command.
+
+**Priority order for shell configuration:**
+1. Command-line flag (e.g., `crumb hook --shell fish`)
+2. TOML config file (`~/.config/crumb/crumb.toml`)
+3. Default value (`bash`)
+
+**Example usage:**
+
+```bash
+# Without TOML config - must specify shell flag
+$ crumb hook --shell fish
+
+# With TOML config (shell = "fish")
+$ crumb hook
+# Automatically uses fish shell from config
+
+# CLI flag still overrides TOML config
+$ crumb hook --shell bash
+# Uses bash despite TOML config
+```
+
 
 ## Development
 
