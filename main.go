@@ -8,6 +8,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"crumb/pkg/commands"
+	"crumb/pkg/config"
 )
 
 // Version information (injected by GoReleaser)
@@ -72,9 +73,10 @@ func main() {
 						Usage: "Output in shell-compatible format for sourcing",
 					},
 					&cli.StringFlag{
-						Name:  "shell",
-						Usage: "Shell format for export (bash or fish)",
-						Value: "bash",
+						Name:    "shell",
+						Usage:   "Shell format for export (bash or fish)",
+						Value:   "bash",
+						Sources: cli.NewValueSourceChain(config.NewTomlValueSource("shell")),
 					},
 				},
 			},
@@ -122,9 +124,10 @@ func main() {
 				Usage: "Export secrets as shell-compatible environment variables",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
-						Name:  "shell",
-						Usage: "Shell format (bash or fish)",
-						Value: "bash",
+						Name:    "shell",
+						Usage:   "Shell format (bash or fish)",
+						Value:   "bash",
+						Sources: cli.NewValueSourceChain(config.NewTomlValueSource("shell")),
 					},
 					&cli.StringFlag{
 						Name:    "file",
@@ -150,9 +153,10 @@ func main() {
 				ArgsUsage: "<shell>",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
-						Name:  "shell",
-						Usage: "Shell format (bash, zsh or fish)",
-						Value: "bash",
+						Name:    "shell",
+						Usage:   "Shell format (bash, zsh or fish)",
+						Value:   "bash",
+						Sources: cli.NewValueSourceChain(config.NewTomlValueSource("shell")),
 					},
 				},
 				Action: commands.HookCommand,

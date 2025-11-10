@@ -9,6 +9,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/BurntSushi/toml"
 	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 )
@@ -35,6 +36,11 @@ type EnvironmentConfig struct {
 	Path  string            `yaml:"path"`
 	Remap map[string]string `yaml:"remap"`
 	Env   map[string]string `yaml:"env"`
+}
+
+// TomlConfig represents the TOML configuration in ~/.config/crumb/crumb.toml
+type TomlConfig struct {
+	Shell string `toml:"shell"`
 }
 
 // LoadConfig loads the profile configuration from ~/.config/crumb/config.yaml
@@ -256,4 +262,32 @@ func PromptForSecret(prompt string) (string, error) {
 	fmt.Println()
 
 	return string(bytePassword), nil
+}
+
+// LoadTomlConfig loads the TOML configuration from ~/.config/crumb/crumb.toml
+func LoadTomlConfig() (*TomlConfig, error) {
+	configPath := filepath.Join(os.Getenv("HOME"), ".config", "crumb", "crumb.toml")
+
+	// If file doesn't exist, return empty config (not an error)
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return &TomlConfig{}, nil
+	}
+
+	var config TomlConfig
+	if _, err := toml.DecodeFile(configPath, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse TOML config file: %w", err)
+	}
+
+	return &config, nil
+}
+
+// GetShellFromConfig returns the shell value from TOML config, or empty string if not set
+func GetShellFromConfig() string {
+	config, err := LoadTomlConfig()
+	if err != nil {
+		// If there's an error reading config, just return empty string
+		// This allows the application to continue with defaults
+		return ""
+	}
+	return config.Shell
 }

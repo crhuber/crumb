@@ -1,0 +1,8 @@
+# Example crumb.toml configuration file
+# Place this file at: ~/.config/crumb/crumb.toml
+
+# Shell configuration
+# Specifies the default shell format for get, export, and hook commands
+# Supported values: "bash", "fish", "zsh"
+# Default: "bash"
+shell = "bash"
