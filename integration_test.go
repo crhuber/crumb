@@ -565,3 +565,87 @@ func TestExportCommandDiffOutput(t *testing.T) {
 		// 4. Variables should be sorted alphabetically within their category
 	})
 }
+
+func TestGetCommandWithTomlShowValues(t *testing.T) {
+	// Create a temporary directory for test config
+	tempDir, err := os.MkdirTemp("", "crumb_get_show_test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Set HOME to temp directory
+	originalHome := os.Getenv("HOME")
+	os.Setenv("HOME", tempDir)
+	defer os.Setenv("HOME", originalHome)
+
+	// Create config directory
+	configDir := filepath.Join(tempDir, ".config", "crumb")
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		t.Fatalf("Failed to create config dir: %v", err)
+	}
+
+	tests := []struct {
+		name               string
+		tomlContent        string
+		expectShowBehavior bool
+	}{
+		{
+			name:               "show_values true in toml",
+			tomlContent:        "show_values = true",
+			expectShowBehavior: true,
+		},
+		{
+			name:               "show_values false in toml",
+			tomlContent:        "show_values = false",
+			expectShowBehavior: false,
+		},
+		{
+			name:               "show_values not set",
+			tomlContent:        "",
+			expectShowBehavior: false,
+		},
+		{
+			name:               "toml with multiple settings",
+			tomlContent:        "shell = \"fish\"\nshow_values = true",
+			expectShowBehavior: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Write TOML config file
+			configPath := filepath.Join(configDir, "crumb.toml")
+			if err := os.WriteFile(configPath, []byte(tt.tomlContent), 0600); err != nil {
+				t.Fatalf("Failed to write config file: %v", err)
+			}
+
+			// Load the config and check the show_values field
+			cfg, err := config.LoadTomlConfig()
+			if err != nil {
+				t.Fatalf("Failed to load TOML config: %v", err)
+			}
+
+			if cfg.ShowValues != tt.expectShowBehavior {
+				t.Errorf("Expected ShowValues=%v, got ShowValues=%v", tt.expectShowBehavior, cfg.ShowValues)
+			}
+
+			// Test the value source
+			vs := config.NewTomlValueSource("show")
+			value, found := vs.Lookup()
+
+			if tt.expectShowBehavior {
+				if !found {
+					t.Error("Expected to find 'show' value in TOML config")
+				}
+				if value != "true" {
+					t.Errorf("Expected value 'true', got %q", value)
+				}
+			} else {
+				if found {
+					t.Error("Expected not to find 'show' value in TOML config")
+				}
+			}
+		})
+	}
+}
