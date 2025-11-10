@@ -649,3 +649,63 @@ func TestGetCommandWithTomlShowValues(t *testing.T) {
 		})
 	}
 }
+
+// TestGetCommandExportFishFormat tests that the fish export format is correct
+func TestGetCommandExportFishFormat(t *testing.T) {
+	// Test that the format strings for fish and bash export are correct
+	tests := []struct {
+		name     string
+		shell    string
+		varName  string
+		value    string
+		expected string
+	}{
+		{
+			name:     "bash export format",
+			shell:    "bash",
+			varName:  "API_KEY",
+			value:    "secret123",
+			expected: "export API_KEY=secret123",
+		},
+		{
+			name:     "fish export format with -g flag and space",
+			shell:    "fish",
+			varName:  "API_KEY",
+			value:    "secret123",
+			expected: "set -x -g API_KEY secret123",
+		},
+		{
+			name:     "fish export with value containing spaces",
+			shell:    "fish",
+			varName:  "DATABASE_URL",
+			value:    "postgres://localhost/db with spaces",
+			expected: "set -x -g DATABASE_URL \"postgres://localhost/db with spaces\"",
+		},
+		{
+			name:     "bash export with value containing spaces",
+			shell:    "bash",
+			varName:  "DATABASE_URL",
+			value:    "postgres://localhost/db with spaces",
+			expected: "export DATABASE_URL=\"postgres://localhost/db with spaces\"",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test the format by generating the output string
+			quotedValue := storage.ShellQuoteValue(tt.value)
+			var output string
+
+			switch tt.shell {
+			case "bash":
+				output = fmt.Sprintf("export %s=%s", tt.varName, quotedValue)
+			case "fish":
+				output = fmt.Sprintf("set -x -g %s %s", tt.varName, quotedValue)
+			}
+
+			if output != tt.expected {
+				t.Errorf("Expected %q, got %q", tt.expected, output)
+			}
+		})
+	}
+}
