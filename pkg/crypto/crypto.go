@@ -1,16 +1,15 @@
 package crypto
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"strings"
-	"syscall"
 
 	"filippo.io/age"
 	"filippo.io/age/agessh"
 	"golang.org/x/sys/unix"
-	"golang.org/x/term"
 )
 
 // ValidateSSHKeys validates that the provided SSH key pair is valid and compatible
@@ -173,24 +172,14 @@ func ReadFileWithLock(filePath string) ([]byte, error) {
 func ConfirmOverwrite(item string) bool {
 	fmt.Printf("%s already exists. Overwrite? (y/n): ", item)
 
-	// Use terminal to read a single character
-	oldState, err := term.MakeRaw(int(syscall.Stdin))
+	// Read a single line of input
+	reader := bufio.NewReader(os.Stdin)
+	response, err := reader.ReadString('\n')
 	if err != nil {
 		return false
 	}
-	defer term.Restore(int(syscall.Stdin), oldState)
 
-	response := make([]byte, 1)
-	n, err := os.Stdin.Read(response)
-	if err != nil || n != 1 {
-		return false
-	}
-
-	fmt.Println() // Print newline after the character
-
-	// Explicitly check bounds to satisfy gosec
-	if len(response) >= 1 {
-		return response[0] == 'y' || response[0] == 'Y'
-	}
-	return false
+	// Clean up the response and check
+	response = strings.TrimSpace(strings.ToLower(response))
+	return response == "y" || response == "yes"
 }

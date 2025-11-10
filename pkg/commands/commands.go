@@ -213,6 +213,8 @@ func SetCommand(_ context.Context, cmd *cli.Command) error {
 			fmt.Println("Operation cancelled.")
 			return nil
 		}
+		// Ensure output is flushed before next prompt
+		os.Stdout.Sync()
 	}
 
 	// Prompt for the secret value (not echoed to terminal)
