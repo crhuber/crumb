@@ -245,3 +245,88 @@ func TestTomlValueSourceNoConfig(t *testing.T) {
 		t.Errorf("Expected empty value, got %q", value)
 	}
 }
+
+func TestTomlValueSourceShowValues(t *testing.T) {
+	// Create a temporary directory for test config
+	tempDir, err := os.MkdirTemp("", "crumb_toml_test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Set HOME to temp directory
+	originalHome := os.Getenv("HOME")
+	os.Setenv("HOME", tempDir)
+	defer os.Setenv("HOME", originalHome)
+
+	// Create config directory
+	configDir := filepath.Join(tempDir, ".config", "crumb")
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		t.Fatalf("Failed to create config dir: %v", err)
+	}
+
+	tests := []struct {
+		name          string
+		tomlContent   string
+		key           string
+		expectedValue string
+		expectedFound bool
+	}{
+		{
+			name:          "show_values true",
+			tomlContent:   `show_values = true`,
+			key:           "show",
+			expectedValue: "true",
+			expectedFound: true,
+		},
+		{
+			name:          "show_values false",
+			tomlContent:   `show_values = false`,
+			key:           "show",
+			expectedValue: "",
+			expectedFound: false,
+		},
+		{
+			name:          "show_values not set",
+			tomlContent:   ``,
+			key:           "show",
+			expectedValue: "",
+			expectedFound: false,
+		},
+		{
+			name:          "both shell and show_values",
+			tomlContent:   "shell = \"fish\"\nshow_values = true",
+			key:           "show",
+			expectedValue: "true",
+			expectedFound: true,
+		},
+		{
+			name:          "both shell and show_values - lookup shell",
+			tomlContent:   "shell = \"fish\"\nshow_values = true",
+			key:           "shell",
+			expectedValue: "fish",
+			expectedFound: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Write config file
+			configPath := filepath.Join(configDir, "crumb.toml")
+			if err := os.WriteFile(configPath, []byte(tt.tomlContent), 0600); err != nil {
+				t.Fatalf("Failed to write config file: %v", err)
+			}
+
+			// Test the value source
+			vs := NewTomlValueSource(tt.key)
+
+			value, found := vs.Lookup()
+			if found != tt.expectedFound {
+				t.Errorf("Expected found=%v, got found=%v", tt.expectedFound, found)
+			}
+			if value != tt.expectedValue {
+				t.Errorf("Expected value %q, got %q", tt.expectedValue, value)
+			}
+		})
+	}
+}

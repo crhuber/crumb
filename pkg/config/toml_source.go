@@ -21,9 +21,14 @@ func (t *TomlValueSource) Lookup() (string, bool) {
 		return "", false
 	}
 
-	// For now, we only support the "shell" key
+	// Support "shell" key
 	if t.key == "shell" && config.Shell != "" {
 		return config.Shell, true
+	}
+
+	// Support "show" key for show_values boolean
+	if t.key == "show" && config.ShowValues {
+		return "true", true
 	}
 
 	return "", false
