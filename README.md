@@ -150,8 +150,9 @@ crumb get <key-path> [--show] [--export] [--shell=bash|fish]
 This command:
 - Validates the key path (must start with `/`, no spaces or special characters)
 - Decrypts the secrets file using the private key
-- By default, displays `****` to mask the value
+- By default, displays `****` to mask the value (unless `show_values = true` in TOML config)
 - Supports `--show` flag to display the actual secret value
+- The `--show` flag can be set as default via `show_values = true` in `~/.config/crumb/crumb.toml`
 - Supports `--export` flag to output in shell-compatible format for sourcing
 - Supports `--shell` flag to select output format when using `--export` (bash or fish, defaulting to bash)
 - When `--export` is used, `--show` is ignored and the secret value is always displayed
@@ -734,6 +735,28 @@ This allows you to set a default shell format without specifying `--shell` on ev
 2. TOML config file (`~/.config/crumb/crumb.toml`)
 3. Default value (`bash`)
 
+**Show values configuration:**
+```toml
+# Display actual secret values by default in get command
+# When true, behaves as if --show flag is always set
+# Default: false
+show_values = true
+```
+
+This allows you to configure whether the `get` command shows actual secret values or masks them by default.
+
+**Priority order for show values:**
+1. Command-line flag (e.g., `crumb get /key --show`)
+2. TOML config file (`~/.config/crumb/crumb.toml`)
+3. Default value (masked - `****`)
+
+**Example configuration file:**
+```toml
+# ~/.config/crumb/crumb.toml
+shell = "fish"
+show_values = true
+```
+
 **Example usage:**
 
 ```bash
@@ -747,6 +770,21 @@ $ crumb hook
 # CLI flag still overrides TOML config
 $ crumb hook --shell bash
 # Uses bash despite TOML config
+
+# With show_values = true in TOML config
+$ crumb get /api/key
+my_secret_value
+# Shows actual value without needing --show flag
+
+# With show_values = false (or not set) in TOML config
+$ crumb get /api/key
+****
+# Masks the value
+
+# CLI flag overrides TOML config
+$ crumb get /api/key --show
+my_secret_value
+# Always shows value when --show flag is used
 ```
 
 
