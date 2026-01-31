@@ -519,24 +519,46 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 	envVars := make(map[string]string)
 
 	if pathFlag != "" {
-		// Direct path export mode - export all secrets matching the path
-		pathPrefix := strings.TrimSuffix(pathFlag, "/")
+		// Check if path ends with trailing slash (prefix mode) or not (exact match mode)
+		isPathPrefix := strings.HasSuffix(pathFlag, "/")
 
-		// Add comment for clarity
-		comment := fmt.Sprintf("# Exported from %s", pathPrefix)
-		switch shell {
-		case "bash":
-			fmt.Println(comment)
-		case "fish":
-			fmt.Println(comment)
-		}
+		if isPathPrefix {
+			// Prefix mode - export all secrets matching the path prefix
+			pathPrefix := strings.TrimSuffix(pathFlag, "/")
 
-		// Find all secrets that match the path prefix
-		pathSecrets := storage.GetSecretsForPath(secrets, pathPrefix)
-		for secretPath, secretValue := range pathSecrets {
-			keyName := storage.ConvertPathToEnvVar(secretPath, pathPrefix)
-			if keyName != "" {
-				envVars[keyName] = secretValue
+			// Add comment for clarity
+			comment := fmt.Sprintf("# Exported from %s", pathPrefix)
+			switch shell {
+			case "bash":
+				fmt.Println(comment)
+			case "fish":
+				fmt.Println(comment)
+			}
+
+			// Find all secrets that match the path prefix
+			pathSecrets := storage.GetSecretsForPath(secrets, pathPrefix)
+			for secretPath, secretValue := range pathSecrets {
+				keyName := storage.ConvertPathToEnvVar(secretPath, pathPrefix)
+				if keyName != "" {
+					envVars[keyName] = secretValue
+				}
+			}
+		} else {
+			// Exact match mode - export only the specific key
+			if secretValue, exists := storage.SecretExists(secrets, pathFlag); exists {
+				// Add comment for clarity
+				comment := fmt.Sprintf("# Exported from %s", pathFlag)
+				switch shell {
+				case "bash":
+					fmt.Println(comment)
+				case "fish":
+					fmt.Println(comment)
+				}
+
+				keyName := storage.ExtractVarName(pathFlag)
+				if keyName != "" {
+					envVars[keyName] = secretValue
+				}
 			}
 		}
 	} else {
