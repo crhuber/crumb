@@ -13,16 +13,18 @@ This is **Crumb** - a Go-based CLI tool for secure secret management. It encrypt
 - **Modular package architecture**: Code organized into focused packages for maintainability
 - **CLI framework**: Uses `github.com/urfave/cli/v3` for command-line interface
 - **Encryption**: Uses `filippo.io/age` and `filippo.io/age/agessh` for SSH key-based encryption
-- **File locking**: Uses `golang.org/x/sys/unix` for safe concurrent access to encrypted files
+- **Storage backends**: Pluggable Backend interface supporting local files and S3-compatible stores (`aws-sdk-go-v2`)
+- **File locking**: Uses `golang.org/x/sys/unix` for safe concurrent access to local encrypted files
 - **Configuration**: YAML-based configuration using `gopkg.in/yaml.v3`
 
 ### Package Structure
 
+- **`pkg/backend`**: Storage backend abstraction (`Backend` interface, `FileBackend`, `S3Backend`, factory)
 - **`pkg/config`**: Configuration management, validation, and file operations
 - **`pkg/crypto`**: SSH key validation, encryption/decryption, and file locking
 - **`pkg/storage`**: Secret storage, parsing, filtering, and data operations
 - **`pkg/commands`**: CLI command implementations and business logic
-- **`main.go`**: CLI setup and command routing (~150 lines)
+- **`main.go`**: CLI setup and command routing
 
 ### Key Data Structures
 

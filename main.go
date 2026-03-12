@@ -33,17 +33,31 @@ func main() {
 				Value:   "default",
 				Sources: cli.EnvVars("CRUMB_PROFILE"),
 			},
-			&cli.StringFlag{
-				Name:    "storage",
-				Usage:   "Storage file path",
-				Sources: cli.EnvVars("CRUMB_STORAGE"),
-			},
 		},
 		Commands: []*cli.Command{
 			{
 				Name:   "setup",
 				Usage:  "Initialize the secure storage backend",
 				Action: commands.SetupCommand,
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "storage",
+						Usage: "Storage backend type (local or s3)",
+						Value: "local",
+					},
+					&cli.StringFlag{
+						Name:  "s3-bucket",
+						Usage: "S3 bucket name (required for s3 storage)",
+					},
+					&cli.StringFlag{
+						Name:  "s3-key",
+						Usage: "S3 object key path (required for s3 storage)",
+					},
+					&cli.StringFlag{
+						Name:  "s3-endpoint-url",
+						Usage: "Custom S3 endpoint URL (for MinIO, LocalStack, etc.)",
+					},
+				},
 			},
 			{
 				Name:      "list",

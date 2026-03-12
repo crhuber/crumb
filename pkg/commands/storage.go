@@ -33,27 +33,26 @@ func StorageSetCommand(_ context.Context, cmd *cli.Command) error {
 		}
 	}
 
-	// Initialize profiles map if needed
 	if cfg.Profiles == nil {
 		cfg.Profiles = make(map[string]config.ProfileConfig)
 	}
 
-	// Get existing profile config or create new one
 	profileConfig := cfg.Profiles[profile]
 	if profileConfig.PublicKeyPath == "" {
 		return fmt.Errorf("profile '%s' not found. Run 'crumb setup --profile %s' first", profile, profile)
 	}
 
-	// Update storage path
-	profileConfig.Storage = config.ExpandTilde(storagePath)
+	// Update local storage path
+	expandedPath := config.ExpandTilde(storagePath)
+	profileConfig.Storage.Local = &config.LocalStorageConfig{Path: expandedPath}
+	profileConfig.Storage.S3 = nil // Clear S3 if switching to local
 	cfg.Profiles[profile] = profileConfig
 
-	// Save config
 	if err := config.SaveConfig(&cfg); err != nil {
 		return err
 	}
 
-	fmt.Printf("Storage path set to: %s (profile: %s)\n", profileConfig.Storage, profile)
+	fmt.Printf("Storage path set to: %s (profile: %s)\n", expandedPath, profile)
 	return nil
 }
 
@@ -65,8 +64,19 @@ func StorageGetCommand(_ context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	storagePath := config.GetStoragePath(cmd.String("storage"), cfg)
-	fmt.Printf("Storage: %s (profile: %s)\n", storagePath, profile)
+	if cfg.Storage.S3 != nil {
+		s3 := cfg.Storage.S3
+		fmt.Printf("Storage: s3://%s/%s (profile: %s)\n", s3.Bucket, s3.Key, profile)
+		if s3.EndpointURL != "" {
+			fmt.Printf("Endpoint: %s\n", s3.EndpointURL)
+		}
+	} else {
+		path := config.GetLocalStoragePath(cfg)
+		if path == "" {
+			path = filepath.Join(os.Getenv("HOME"), ".config", "crumb", "secrets")
+		}
+		fmt.Printf("Storage: %s (profile: %s)\n", path, profile)
+	}
 	return nil
 }
 
@@ -74,7 +84,6 @@ func StorageGetCommand(_ context.Context, cmd *cli.Command) error {
 func StorageClearCommand(_ context.Context, cmd *cli.Command) error {
 	profile := getProfile(cmd)
 
-	// Load config
 	configDir := filepath.Join(os.Getenv("HOME"), ".config", "crumb")
 	configPath := filepath.Join(configDir, "config.yaml")
 
@@ -92,14 +101,12 @@ func StorageClearCommand(_ context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	// Clear storage for the profile
 	if cfg.Profiles != nil && cfg.Profiles[profile].PublicKeyPath != "" {
 		profileConfig := cfg.Profiles[profile]
-		profileConfig.Storage = ""
+		profileConfig.Storage = config.StorageConfig{}
 		cfg.Profiles[profile] = profileConfig
 	}
 
-	// Save config
 	if err := config.SaveConfig(&cfg); err != nil {
 		return err
 	}

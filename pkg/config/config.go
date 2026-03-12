@@ -19,11 +19,68 @@ type Config struct {
 	Profiles map[string]ProfileConfig `yaml:"profiles"`
 }
 
+// LocalStorageConfig holds settings for local file storage.
+type LocalStorageConfig struct {
+	Path string `yaml:"path"`
+}
+
+// S3StorageConfig holds settings for S3-compatible storage.
+type S3StorageConfig struct {
+	Bucket      string `yaml:"bucket"`
+	Key         string `yaml:"key"`
+	EndpointURL string `yaml:"endpoint_url,omitempty"`
+}
+
+// StorageConfig holds the backend-specific storage settings.
+type StorageConfig struct {
+	Local *LocalStorageConfig `yaml:"local,omitempty"`
+	S3    *S3StorageConfig    `yaml:"s3,omitempty"`
+}
+
 // ProfileConfig represents a single profile configuration
 type ProfileConfig struct {
-	PublicKeyPath  string `yaml:"public_key_path"`
-	PrivateKeyPath string `yaml:"private_key_path"`
-	Storage        string `yaml:"storage,omitempty"`
+	PublicKeyPath  string        `yaml:"public_key_path"`
+	PrivateKeyPath string        `yaml:"private_key_path"`
+	Storage        StorageConfig `yaml:"storage"`
+}
+
+// rawProfileConfig is used for backward-compatible YAML unmarshalling.
+type rawProfileConfig struct {
+	PublicKeyPath  string      `yaml:"public_key_path"`
+	PrivateKeyPath string      `yaml:"private_key_path"`
+	Storage        interface{} `yaml:"storage"`
+}
+
+// UnmarshalYAML supports both the legacy string format and the new struct format.
+func (p *ProfileConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var raw rawProfileConfig
+	if err := unmarshal(&raw); err != nil {
+		return err
+	}
+
+	p.PublicKeyPath = raw.PublicKeyPath
+	p.PrivateKeyPath = raw.PrivateKeyPath
+
+	switch v := raw.Storage.(type) {
+	case string:
+		// Legacy format: storage was a plain path string
+		if v != "" {
+			p.Storage.Local = &LocalStorageConfig{Path: v}
+		}
+	case map[string]interface{}:
+		// New structured format — re-marshal and unmarshal into StorageConfig
+		data, err := yaml.Marshal(v)
+		if err != nil {
+			return fmt.Errorf("failed to re-marshal storage config: %w", err)
+		}
+		if err := yaml.Unmarshal(data, &p.Storage); err != nil {
+			return fmt.Errorf("failed to parse storage config: %w", err)
+		}
+	case nil:
+		// No storage configured
+	}
+
+	return nil
 }
 
 // CrumbConfig represents the per-project configuration in .crumb.yaml
@@ -212,19 +269,12 @@ func ExpandTilde(path string) string {
 	return path
 }
 
-// GetStoragePath determines the storage path based on CLI flags, profile settings, and defaults
-func GetStoragePath(storageFlag string, profile *ProfileConfig) string {
-	// Priority: CLI flag > profile storage > default
-	if storageFlag != "" {
-		return ExpandTilde(storageFlag)
+// GetLocalStoragePath returns the resolved local file path from the profile, or empty string if not configured.
+func GetLocalStoragePath(profile *ProfileConfig) string {
+	if profile.Storage.Local != nil && profile.Storage.Local.Path != "" {
+		return ExpandTilde(profile.Storage.Local.Path)
 	}
-
-	if profile.Storage != "" {
-		return ExpandTilde(profile.Storage)
-	}
-
-	// Default storage path
-	return filepath.Join(os.Getenv("HOME"), ".config", "crumb", "secrets")
+	return ""
 }
 
 // PromptForInput prompts the user for input and returns the trimmed response

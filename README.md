@@ -1,6 +1,6 @@
 # Crumb - Secret Management Tool
 
-`crumb` is a command line tool designed to securely store, manage, and export API keys and secrets for developers. It uses an encrypted plain text file as the backend, leveraging the `age` encryption library with SSH public/private key pairs for encryption and decryption.
+`crumb` is a command line tool designed to securely store, manage, and export API keys and secrets for developers. It uses `age` encryption with SSH public/private key pairs, and supports both local file storage and S3-compatible backends (AWS S3, MinIO, LocalStack).
 
 `crumb` is inspired by tools such as:
 
@@ -15,8 +15,9 @@ but, designed for the non-enterprise developer without access to a cloud Secrets
 
 ## Features
 
-- **SSH Key Encryption/Decryption**: Securely encrypt your password strorage file using SSH Keys
-- **Bulk Export**: Explorts multiple secrets from a entire path like `/app/prod/`
+- **SSH Key Encryption/Decryption**: Securely encrypt your password storage file using SSH Keys
+- **S3 Storage Backend**: Store encrypted secrets in AWS S3 or S3-compatible services (MinIO, LocalStack)
+- **Bulk Export**: Exports multiple secrets from an entire path like `/app/prod/`
 - **Multi-Profile Support**: Manage separate secret stores for work, personal, or different projects
 - **.env Import**: Import multiple secrets from `.env` files
 - **Shell Integration**: Automatic secret loading with shell hooks (bash, zsh, fish)
@@ -72,6 +73,21 @@ Enter path to SSH private key (e.g., ~/.ssh/id_ed25519): ~/.ssh/id_ed25519
 Setup completed successfully for profile 'default'!
 Config file: /Users/username/.config/crumb/config.yaml
 Storage file: /Users/username/.config/crumb/secrets
+```
+
+**Setup with S3 storage:**
+```bash
+$ crumb setup --storage s3 --s3-bucket my-secrets-bucket --s3-key /crumb/production.enc
+Enter path to SSH public key (e.g., ~/.ssh/id_ed25519.pub): ~/.ssh/id_ed25519.pub
+Enter path to SSH private key (e.g., ~/.ssh/id_ed25519): ~/.ssh/id_ed25519
+Setup completed successfully for profile 'default'!
+Config file: /Users/username/.config/crumb/config.yaml
+Storage: s3://my-secrets-bucket//crumb/production.enc
+```
+
+**Setup with S3-compatible endpoint (MinIO, LocalStack):**
+```bash
+$ crumb setup --storage s3 --s3-bucket local-bucket --s3-key /secrets.enc --s3-endpoint-url http://localhost:9000
 ```
 
 **Setup with non default profile**
@@ -396,12 +412,6 @@ $ crumb ls /dev/myapp
 $ crumb --profile work import --file work.env --path /work/secrets
 ```
 
-**Using with different storage location:**
-```bash
-# Import to custom storage location
-$ crumb --storage ~/project-secrets import --file project.env --path /project/config
-```
-
 ### Storage Management Commands
 
 The `storage` command provides subcommands to manage storage file paths for profiles.
@@ -443,8 +453,6 @@ Storage: /Users/username/.config/crumb/work-secrets (profile: work)
 $ crumb storage get
 Storage: /Users/username/.config/crumb/secrets (profile: default)
 
-# Override storage path for one command
-crumb --storage ~/backup-secrets ls
 ```
 
 #### Storage Clear
@@ -460,9 +468,6 @@ Example:
 # Clear custom storage path for work profile
 $ crumb --profile work storage clear
 Storage path cleared for profile: work (using default)
-# Override storage path temporarily
-export CRUMB_STORAGE=~/temp-secrets
-crumb set /temp/key "temporary value"
 ```
 
 ## Profile Management
@@ -699,15 +704,23 @@ profiles:
   default:
     public_key_path: ~/.ssh/id_ed25519.pub
     private_key_path: ~/.ssh/id_ed25519
-    storage: ~/.config/crumb/secrets
+    storage:
+      local:
+        path: ~/.config/crumb/secrets
   work:
     public_key_path: ~/.ssh/work.pub
     private_key_path: ~/.ssh/work
-    storage: ~/.config/crumb/work-secrets
-  personal:
-    public_key_path: ~/.ssh/personal.pub
-    private_key_path: ~/.ssh/personal
-    storage: ~/personal-secrets
+    storage:
+      local:
+        path: ~/.config/crumb/work-secrets
+  production:
+    public_key_path: ~/.ssh/prod.pub
+    private_key_path: ~/.ssh/prod
+    storage:
+      s3:
+        bucket: my-secrets-bucket
+        key: /crumb/production.enc
+        endpoint_url: ""  # optional, for MinIO etc.
 ```
 
 ### Storage Files

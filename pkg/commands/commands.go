@@ -12,6 +12,7 @@ import (
 	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
 
+	"crumb/pkg/backend"
 	"crumb/pkg/config"
 	"crumb/pkg/crypto"
 	"crumb/pkg/storage"
@@ -58,9 +59,51 @@ func SetupCommand(_ context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("invalid or missing SSH key pair. Please generate an SSH key pair using `ssh-keygen -t rsa` or `ssh-keygen -t ed25519` first: %w", err)
 	}
 
-	// Get storage path (from CLI flag or prompt if not provided)
-	storagePath := cmd.String("storage")
-	if storagePath == "" {
+	// Determine storage backend type
+	storageType := cmd.String("storage")
+	if storageType == "" {
+		storageType = "local"
+	}
+
+	var profileConfig config.ProfileConfig
+	profileConfig.PublicKeyPath = publicKeyPath
+	profileConfig.PrivateKeyPath = privateKeyPath
+
+	var b backend.Backend
+
+	switch storageType {
+	case "s3":
+		bucket := cmd.String("s3-bucket")
+		key := cmd.String("s3-key")
+		endpointURL := cmd.String("s3-endpoint-url")
+
+		if bucket == "" {
+			return fmt.Errorf("--s3-bucket is required when using S3 storage")
+		}
+		if key == "" {
+			return fmt.Errorf("--s3-key is required when using S3 storage")
+		}
+
+		s3Backend := &backend.S3Backend{
+			Bucket:      bucket,
+			Key:         key,
+			EndpointURL: endpointURL,
+		}
+
+		// Verify S3 connectivity
+		if _, err := s3Backend.Exists(); err != nil {
+			return fmt.Errorf("failed to connect to S3: %w", err)
+		}
+
+		profileConfig.Storage.S3 = &config.S3StorageConfig{
+			Bucket:      bucket,
+			Key:         key,
+			EndpointURL: endpointURL,
+		}
+		b = s3Backend
+
+	default: // "local"
+		var storagePath string
 		if profile == "default" {
 			storagePath = filepath.Join(os.Getenv("HOME"), ".config", "crumb", "secrets")
 		} else {
@@ -69,42 +112,33 @@ func SetupCommand(_ context.Context, cmd *cli.Command) error {
 			if err != nil {
 				return err
 			}
-			// Use default if empty
 			if strings.TrimSpace(storagePath) == "" {
 				storagePath = defaultStorage
 			}
 		}
-	}
-	storagePath = config.ExpandTilde(storagePath)
+		storagePath = config.ExpandTilde(storagePath)
 
-	// Create storage directory if it doesn't exist
-	storageDir := filepath.Dir(storagePath)
-	if err := os.MkdirAll(storageDir, 0700); err != nil {
-		return fmt.Errorf("failed to create storage directory: %w", err)
+		// Create storage directory if it doesn't exist
+		storageDir := filepath.Dir(storagePath)
+		if err := os.MkdirAll(storageDir, 0700); err != nil {
+			return fmt.Errorf("failed to create storage directory: %w", err)
+		}
+
+		profileConfig.Storage.Local = &config.LocalStorageConfig{Path: storagePath}
+		b = &backend.FileBackend{Path: storagePath}
 	}
 
 	// Load existing config or create new one
 	var cfg config.Config
 	if _, err := os.Stat(configPath); err == nil {
-		// Try to load existing config to preserve other profiles
 		configData, err := os.ReadFile(configPath)
 		if err == nil {
-			// Parse existing full config to preserve other profiles
-			// This loads the complete config with all profiles
 			yaml.Unmarshal(configData, &cfg)
 		}
 	}
 
-	// Initialize profiles map if it doesn't exist
 	if cfg.Profiles == nil {
 		cfg.Profiles = make(map[string]config.ProfileConfig)
-	}
-
-	// Create profile configuration
-	profileConfig := config.ProfileConfig{
-		PublicKeyPath:  publicKeyPath,
-		PrivateKeyPath: privateKeyPath,
-		Storage:        storagePath,
 	}
 
 	cfg.Profiles[profile] = profileConfig
@@ -114,52 +148,62 @@ func SetupCommand(_ context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	// Create empty encrypted secrets file
-	if err := storage.CreateEmptySecretsFile(storagePath, publicKeyPath); err != nil {
-		return fmt.Errorf("failed to create secrets file: %w", err)
+	// Create empty encrypted storage
+	if err := storage.CreateEmptyStorage(publicKeyPath, b); err != nil {
+		return fmt.Errorf("failed to create secrets storage: %w", err)
 	}
 
 	fmt.Printf("Setup completed successfully for profile '%s'!\n", profile)
 	fmt.Printf("Config file: %s\n", configPath)
-	fmt.Printf("Storage file: %s\n", storagePath)
+	if profileConfig.Storage.S3 != nil {
+		fmt.Printf("Storage: s3://%s/%s\n", profileConfig.Storage.S3.Bucket, profileConfig.Storage.S3.Key)
+	} else if profileConfig.Storage.Local != nil {
+		fmt.Printf("Storage file: %s\n", profileConfig.Storage.Local.Path)
+	}
 
 	return nil
 }
 
+// resolveBackend is a helper that loads config and resolves the backend for a command.
+func resolveBackend(cmd *cli.Command) (*config.ProfileConfig, backend.Backend, error) {
+	profile := getProfile(cmd)
+	cfg, err := config.LoadConfig(profile)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	b, err := backend.ResolveBackend(cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return cfg, b, nil
+}
+
 // ListCommand handles the list command
 func ListCommand(_ context.Context, cmd *cli.Command) error {
-	// Get optional path filter argument
 	pathFilter := ""
 	if cmd.Args().Len() > 0 {
 		pathFilter = cmd.Args().Get(0)
 	}
 
-	// Load configuration
-	profile := getProfile(cmd)
-	cfg, err := config.LoadConfig(profile)
+	cfg, b, err := resolveBackend(cmd)
 	if err != nil {
 		return err
 	}
 
-	// Get storage path
-	storagePath := config.GetStoragePath(cmd.String("storage"), cfg)
-
-	// Load and decrypt secrets
-	secrets, err := storage.LoadSecrets(cfg.PrivateKeyPath, storagePath)
+	secrets, err := storage.LoadSecrets(cfg.PrivateKeyPath, b)
 	if err != nil {
 		return err
 	}
 
-	// Check if secrets is empty
 	if len(secrets) == 0 {
 		fmt.Println("No secrets found")
 		return nil
 	}
 
-	// Get filtered and sorted keys
 	keys := storage.GetFilteredKeys(secrets, pathFilter)
 
-	// Display keys
 	if len(keys) == 0 {
 		if pathFilter != "" {
 			fmt.Printf("No secrets found matching path: %s\n", pathFilter)
@@ -178,67 +222,52 @@ func ListCommand(_ context.Context, cmd *cli.Command) error {
 
 // SetCommand handles the set command
 func SetCommand(_ context.Context, cmd *cli.Command) error {
-	// Check arguments - key path is required, value is optional
 	if cmd.Args().Len() < 1 || cmd.Args().Len() > 2 {
 		return fmt.Errorf("usage: crumb set <key-path> [value]")
 	}
 
 	keyPath := cmd.Args().Get(0)
 
-	// Validate key path
 	if err := config.ValidateKeyPath(keyPath); err != nil {
 		return err
 	}
 
-	// Load configuration
-	profile := getProfile(cmd)
-	cfg, err := config.LoadConfig(profile)
+	cfg, b, err := resolveBackend(cmd)
 	if err != nil {
 		return err
 	}
 
-	// Get storage path
-	storagePath := config.GetStoragePath(cmd.String("storage"), cfg)
-
-	// Load and decrypt secrets
-	secrets, err := storage.LoadSecrets(cfg.PrivateKeyPath, storagePath)
+	secrets, err := storage.LoadSecrets(cfg.PrivateKeyPath, b)
 	if err != nil {
 		return err
 	}
 
-	// Check if key exists and prompt for overwrite
 	if _, exists := storage.SecretExists(secrets, keyPath); exists {
 		fmt.Printf("Key '%s' already exists.\n", keyPath)
 		if !crypto.ConfirmOverwrite("key") {
 			fmt.Println("Operation cancelled.")
 			return nil
 		}
-		// Ensure output is flushed before next prompt
 		os.Stdout.Sync()
 	}
 
-	// Get the secret value: from argument if provided, otherwise prompt
 	var value string
 	if cmd.Args().Len() == 2 {
 		value = cmd.Args().Get(1)
 	} else {
-		// Prompt for the secret value (not echoed to terminal)
 		value, err = config.PromptForSecret("Enter secret value: ")
 		if err != nil {
 			return err
 		}
 	}
 
-	// Validate that value is not empty
 	if strings.TrimSpace(value) == "" {
 		return fmt.Errorf("secret value cannot be empty")
 	}
 
-	// Update the key-value pair
 	storage.SetSecret(secrets, keyPath, value)
 
-	// Save encrypted secrets
-	if err := storage.SaveSecrets(secrets, cfg.PublicKeyPath, storagePath); err != nil {
+	if err := storage.SaveSecrets(secrets, cfg.PublicKeyPath, b); err != nil {
 		return err
 	}
 
@@ -248,7 +277,6 @@ func SetCommand(_ context.Context, cmd *cli.Command) error {
 
 // GetCommand handles the get command
 func GetCommand(_ context.Context, cmd *cli.Command) error {
-	// Check arguments
 	if cmd.Args().Len() != 1 {
 		return fmt.Errorf("usage: crumb get <key-path>")
 	}
@@ -258,37 +286,27 @@ func GetCommand(_ context.Context, cmd *cli.Command) error {
 	exportFormat := cmd.Bool("export")
 	shell := cmd.String("shell")
 
-	// Validate key path
 	if err := config.ValidateKeyPath(keyPath); err != nil {
 		return err
 	}
 
-	// Load configuration
-	profile := getProfile(cmd)
-	cfg, err := config.LoadConfig(profile)
+	cfg, b, err := resolveBackend(cmd)
 	if err != nil {
 		return err
 	}
 
-	// Get storage path
-	storagePath := config.GetStoragePath(cmd.String("storage"), cfg)
-
-	// Load and decrypt secrets
-	secrets, err := storage.LoadSecrets(cfg.PrivateKeyPath, storagePath)
+	secrets, err := storage.LoadSecrets(cfg.PrivateKeyPath, b)
 	if err != nil {
 		return err
 	}
 
-	// Check if key exists
 	value, exists := storage.SecretExists(secrets, keyPath)
 	if !exists {
 		fmt.Println("Key not found.")
 		return nil
 	}
 
-	// Handle export format
 	if exportFormat {
-		// Extract variable name from key path
 		varName := storage.ExtractVarName(keyPath)
 		switch shell {
 		case "bash":
@@ -303,7 +321,6 @@ func GetCommand(_ context.Context, cmd *cli.Command) error {
 		return nil
 	}
 
-	// Display the value (existing behavior)
 	if showValue {
 		fmt.Printf("%s\n", value)
 	} else {
@@ -317,7 +334,6 @@ func GetCommand(_ context.Context, cmd *cli.Command) error {
 func InitCommand(_ context.Context, _ *cli.Command) error {
 	configFileName := ".crumb.yaml"
 
-	// Check if .crumb.yaml already exists
 	if _, err := os.Stat(configFileName); err == nil {
 		if !crypto.ConfirmOverwrite(fmt.Sprintf("Config file %s", configFileName)) {
 			fmt.Println("Operation cancelled.")
@@ -325,10 +341,8 @@ func InitCommand(_ context.Context, _ *cli.Command) error {
 		}
 	}
 
-	// Create default config structure
 	defaultConfig := config.CreateDefaultCrumbConfig()
 
-	// Save to file
 	if err := config.SaveCrumbConfig(defaultConfig, configFileName); err != nil {
 		return err
 	}
@@ -339,41 +353,31 @@ func InitCommand(_ context.Context, _ *cli.Command) error {
 
 // DeleteCommand handles the delete command
 func DeleteCommand(_ context.Context, cmd *cli.Command) error {
-	// Check arguments
 	if cmd.Args().Len() != 1 {
 		return fmt.Errorf("usage: crumb delete <key-path>")
 	}
 
 	keyPath := cmd.Args().Get(0)
 
-	// Validate key path
 	if err := config.ValidateKeyPath(keyPath); err != nil {
 		return err
 	}
 
-	// Load configuration
-	profile := getProfile(cmd)
-	cfg, err := config.LoadConfig(profile)
+	cfg, b, err := resolveBackend(cmd)
 	if err != nil {
 		return err
 	}
 
-	// Get storage path
-	storagePath := config.GetStoragePath(cmd.String("storage"), cfg)
-
-	// Load and decrypt secrets
-	secrets, err := storage.LoadSecrets(cfg.PrivateKeyPath, storagePath)
+	secrets, err := storage.LoadSecrets(cfg.PrivateKeyPath, b)
 	if err != nil {
 		return err
 	}
 
-	// Check if key exists
 	if _, exists := storage.SecretExists(secrets, keyPath); !exists {
 		fmt.Println("Key not found.")
 		return nil
 	}
 
-	// Prompt user to confirm by typing exact key path
 	fmt.Printf("Type the key path to confirm deletion: ")
 	reader := bufio.NewReader(os.Stdin)
 	confirmation, err := reader.ReadString('\n')
@@ -387,14 +391,12 @@ func DeleteCommand(_ context.Context, cmd *cli.Command) error {
 		return nil
 	}
 
-	// Remove the key-value pair
 	if !storage.DeleteSecret(secrets, keyPath) {
 		fmt.Println("Key not found.")
 		return nil
 	}
 
-	// Save encrypted secrets
-	if err := storage.SaveSecrets(secrets, cfg.PublicKeyPath, storagePath); err != nil {
+	if err := storage.SaveSecrets(secrets, cfg.PublicKeyPath, b); err != nil {
 		return err
 	}
 
@@ -404,7 +406,6 @@ func DeleteCommand(_ context.Context, cmd *cli.Command) error {
 
 // MoveCommand handles the move command
 func MoveCommand(_ context.Context, cmd *cli.Command) error {
-	// Check arguments
 	if cmd.Args().Len() != 2 {
 		return fmt.Errorf("usage: crumb move <old-key-path> <new-key-path>")
 	}
@@ -412,7 +413,6 @@ func MoveCommand(_ context.Context, cmd *cli.Command) error {
 	oldKeyPath := cmd.Args().Get(0)
 	newKeyPath := cmd.Args().Get(1)
 
-	// Validate key paths
 	if err := config.ValidateKeyPath(oldKeyPath); err != nil {
 		return fmt.Errorf("invalid old key path: %w", err)
 	}
@@ -420,29 +420,21 @@ func MoveCommand(_ context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("invalid new key path: %w", err)
 	}
 
-	// Load configuration
-	profile := getProfile(cmd)
-	cfg, err := config.LoadConfig(profile)
+	cfg, b, err := resolveBackend(cmd)
 	if err != nil {
 		return err
 	}
 
-	// Get storage path
-	storagePath := config.GetStoragePath(cmd.String("storage"), cfg)
-
-	// Load and decrypt secrets
-	secrets, err := storage.LoadSecrets(cfg.PrivateKeyPath, storagePath)
+	secrets, err := storage.LoadSecrets(cfg.PrivateKeyPath, b)
 	if err != nil {
 		return err
 	}
 
-	// Use storage package's MoveSecret function
 	if err := storage.MoveSecret(secrets, oldKeyPath, newKeyPath); err != nil {
 		return err
 	}
 
-	// Save encrypted secrets
-	if err := storage.SaveSecrets(secrets, cfg.PublicKeyPath, storagePath); err != nil {
+	if err := storage.SaveSecrets(secrets, cfg.PublicKeyPath, b); err != nil {
 		return err
 	}
 
@@ -455,7 +447,6 @@ func computeEnvDiff(newVars map[string]string) string {
 	var added []string
 	var modified []string
 
-	// Get current environment
 	currentEnv := make(map[string]string)
 	for _, envVar := range os.Environ() {
 		parts := strings.SplitN(envVar, "=", 2)
@@ -464,25 +455,19 @@ func computeEnvDiff(newVars map[string]string) string {
 		}
 	}
 
-	// Compare new vars with current environment
 	for key, newValue := range newVars {
 		if currentValue, exists := currentEnv[key]; exists {
-			// Variable exists - check if modified
 			if currentValue != newValue {
 				modified = append(modified, key)
 			}
-			// If value is the same, we don't show it in the diff
 		} else {
-			// New variable being added
 			added = append(added, key)
 		}
 	}
 
-	// Sort for consistent output
 	sort.Strings(added)
 	sort.Strings(modified)
 
-	// Build the diff string
 	var parts []string
 	for _, key := range added {
 		parts = append(parts, "+"+key)
@@ -496,43 +481,31 @@ func computeEnvDiff(newVars map[string]string) string {
 
 // ExportCommand handles the export command
 func ExportCommand(_ context.Context, cmd *cli.Command) error {
-	// Get shell format (default to bash)
 	shell := cmd.String("shell")
 	if shell == "" {
 		shell = "bash"
 	}
 
-	// Check if --path flag is provided
 	pathFlag := cmd.String("path")
 
-	// Load application configuration
-	profile := getProfile(cmd)
-	cfg, err := config.LoadConfig(profile)
+	cfg, b, err := resolveBackend(cmd)
 	if err != nil {
 		return err
 	}
 
-	// Get storage path
-	storagePath := config.GetStoragePath(cmd.String("storage"), cfg)
-
-	// Load and decrypt secrets
-	secrets, err := storage.LoadSecrets(cfg.PrivateKeyPath, storagePath)
+	secrets, err := storage.LoadSecrets(cfg.PrivateKeyPath, b)
 	if err != nil {
 		return err
 	}
 
-	// Collect environment variables to export
 	envVars := make(map[string]string)
 
 	if pathFlag != "" {
-		// Check if path ends with trailing slash (prefix mode) or not (exact match mode)
 		isPathPrefix := strings.HasSuffix(pathFlag, "/")
 
 		if isPathPrefix {
-			// Prefix mode - export all secrets matching the path prefix
 			pathPrefix := strings.TrimSuffix(pathFlag, "/")
 
-			// Add comment for clarity
 			comment := fmt.Sprintf("# Exported from %s", pathPrefix)
 			switch shell {
 			case "bash":
@@ -541,7 +514,6 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 				fmt.Println(comment)
 			}
 
-			// Find all secrets that match the path prefix
 			pathSecrets := storage.GetSecretsForPath(secrets, pathPrefix)
 			for secretPath, secretValue := range pathSecrets {
 				keyName := storage.ConvertPathToEnvVar(secretPath, pathPrefix)
@@ -550,9 +522,7 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 				}
 			}
 		} else {
-			// Exact match mode - export only the specific key
 			if secretValue, exists := storage.SecretExists(secrets, pathFlag); exists {
-				// Add comment for clarity
 				comment := fmt.Sprintf("# Exported from %s", pathFlag)
 				switch shell {
 				case "bash":
@@ -568,25 +538,20 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 			}
 		}
 	} else {
-		// .crumb.yaml mode with environment support
 		configFile := cmd.String("file")
 		environmentName := cmd.String("env")
 
-		// Load .crumb.yaml configuration
 		crumbConfig, err := config.LoadCrumbConfig(configFile)
 		if err != nil {
 			return err
 		}
 
-		// Get the specified environment
 		envConfig, exists := crumbConfig.Environments[environmentName]
 		if !exists {
 			return fmt.Errorf("environment '%s' not found in %s", environmentName, configFile)
 		}
 
-		// Process path section
 		if envConfig.Path != "" {
-			// Add comment for clarity
 			comment := fmt.Sprintf("# Exported from %s (environment: %s)", envConfig.Path, environmentName)
 			switch shell {
 			case "bash":
@@ -595,11 +560,9 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 				fmt.Println(comment)
 			}
 
-			// Find all secrets that match the path prefix
 			pathPrefix := strings.TrimSuffix(envConfig.Path, "/")
 			pathSecrets := storage.GetSecretsForPath(secrets, pathPrefix)
 			for secretPath, secretValue := range pathSecrets {
-				// Extract the key name from the path
 				keyName := strings.TrimPrefix(secretPath, pathPrefix)
 				keyName = strings.TrimPrefix(keyName, "/")
 				keyName = strings.ToUpper(strings.ReplaceAll(keyName, "/", "_"))
@@ -611,26 +574,19 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 			}
 		}
 
-		// Process env section
 		for envVarName, envVarValue := range envConfig.Env {
-			// Sanitize environment variable name
 			sanitizedEnvVarName := strings.ToUpper(strings.ReplaceAll(envVarName, "-", "_"))
 
-			// If value starts with '/', treat it as a path to a secret
-			// Otherwise, use it as a literal value
 			if strings.HasPrefix(envVarValue, "/") {
 				if secretValue, exists := storage.SecretExists(secrets, envVarValue); exists {
 					envVars[sanitizedEnvVarName] = secretValue
 				}
 			} else {
-				// Use literal value directly
 				envVars[sanitizedEnvVarName] = envVarValue
 			}
 		}
 
-		// Apply remap mappings
 		for originalKey, newKey := range envConfig.Remap {
-			// Sanitize both original and new key names
 			sanitizedOriginalKey := strings.ToUpper(strings.ReplaceAll(originalKey, "-", "_"))
 			sanitizedNewKey := strings.ToUpper(strings.ReplaceAll(newKey, "-", "_"))
 
@@ -641,25 +597,21 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 		}
 	}
 
-	// Generate shell output
 	if len(envVars) == 0 {
 		return fmt.Errorf("no secrets found to export")
 	}
 
-	// Compute and print the environment diff status to stderr
 	diffStatus := computeEnvDiff(envVars)
 	if diffStatus != "" {
 		fmt.Fprintf(os.Stderr, "crumb: export %s\n", diffStatus)
 	}
 
-	// Sort keys for consistent output
 	var keys []string
 	for key := range envVars {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
 
-	// Output environment variables
 	for _, key := range keys {
 		value := envVars[key]
 		switch shell {
@@ -677,7 +629,6 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 
 // ImportCommand handles importing secrets from a .env file
 func ImportCommand(_ context.Context, cmd *cli.Command) error {
-	// Check required flags
 	filePath := cmd.String("file")
 	basePath := cmd.String("path")
 
@@ -688,12 +639,10 @@ func ImportCommand(_ context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("--path flag is required")
 	}
 
-	// Validate base path
 	if err := config.ValidateKeyPath(basePath); err != nil {
 		return fmt.Errorf("invalid path: %w", err)
 	}
 
-	// Parse .env file
 	envVars, err := storage.ParseEnvFile(filePath)
 	if err != nil {
 		return err
@@ -704,35 +653,24 @@ func ImportCommand(_ context.Context, cmd *cli.Command) error {
 		return nil
 	}
 
-	// Load configuration
-	profile := getProfile(cmd)
-	cfg, err := config.LoadConfig(profile)
+	cfg, b, err := resolveBackend(cmd)
 	if err != nil {
 		return err
 	}
 
-	// Get storage path
-	storagePath := config.GetStoragePath(cmd.String("storage"), cfg)
-
-	// Load and decrypt existing secrets
-	secrets, err := storage.LoadSecrets(cfg.PrivateKeyPath, storagePath)
+	secrets, err := storage.LoadSecrets(cfg.PrivateKeyPath, b)
 	if err != nil {
 		return err
 	}
 
-	// Ensure base path ends without trailing slash for consistency
 	basePath = strings.TrimSuffix(basePath, "/")
 
-	// Track conflicts and new keys
 	var conflicts []string
 	var newKeys []string
 
-	// Process each environment variable
 	for envKey := range envVars {
-		// Create full key path (preserve original case)
 		fullKeyPath := basePath + "/" + envKey
 
-		// Check if key already exists
 		if _, exists := storage.SecretExists(secrets, fullKeyPath); exists {
 			conflicts = append(conflicts, fullKeyPath)
 		} else {
@@ -740,7 +678,6 @@ func ImportCommand(_ context.Context, cmd *cli.Command) error {
 		}
 	}
 
-	// Display summary
 	fmt.Printf("Found %d environment variables in %s\n", len(envVars), filePath)
 	if len(newKeys) > 0 {
 		fmt.Printf("New keys to import: %d\n", len(newKeys))
@@ -752,7 +689,6 @@ func ImportCommand(_ context.Context, cmd *cli.Command) error {
 		}
 	}
 
-	// Confirm import if there are conflicts
 	if len(conflicts) > 0 {
 		fmt.Print("Continue with import? This will overwrite existing keys. (y/n): ")
 		reader := bufio.NewReader(os.Stdin)
@@ -767,7 +703,6 @@ func ImportCommand(_ context.Context, cmd *cli.Command) error {
 		}
 	}
 
-	// Import the secrets
 	importedCount := 0
 	for envKey, envValue := range envVars {
 		fullKeyPath := basePath + "/" + envKey
@@ -775,8 +710,7 @@ func ImportCommand(_ context.Context, cmd *cli.Command) error {
 		importedCount++
 	}
 
-	// Save encrypted secrets
-	if err := storage.SaveSecrets(secrets, cfg.PublicKeyPath, storagePath); err != nil {
+	if err := storage.SaveSecrets(secrets, cfg.PublicKeyPath, b); err != nil {
 		return err
 	}
 

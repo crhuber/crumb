@@ -8,12 +8,17 @@ import (
 
 	"filippo.io/age"
 
+	"crumb/pkg/backend"
 	"crumb/pkg/crypto"
 )
 
-// LoadSecrets loads and decrypts secrets from the storage file
-func LoadSecrets(privateKeyPath, storagePath string) (map[string]string, error) {
-	if _, err := os.Stat(storagePath); os.IsNotExist(err) {
+// LoadSecrets loads and decrypts secrets from the given backend.
+func LoadSecrets(privateKeyPath string, b backend.Backend) (map[string]string, error) {
+	exists, err := b.Exists()
+	if err != nil {
+		return nil, fmt.Errorf("failed to check storage: %w", err)
+	}
+	if !exists {
 		return make(map[string]string), nil
 	}
 
@@ -23,10 +28,10 @@ func LoadSecrets(privateKeyPath, storagePath string) (map[string]string, error) 
 		return nil, err
 	}
 
-	// Read and decrypt secrets file
-	encryptedData, err := crypto.ReadFileWithLock(storagePath)
+	// Read and decrypt secrets
+	encryptedData, err := b.Read()
 	if err != nil {
-		return nil, fmt.Errorf("failed to read secrets file: %w", err)
+		return nil, fmt.Errorf("failed to read secrets: %w", err)
 	}
 
 	if len(encryptedData) == 0 {
@@ -43,8 +48,8 @@ func LoadSecrets(privateKeyPath, storagePath string) (map[string]string, error) 
 	return secrets, nil
 }
 
-// SaveSecrets encrypts and saves secrets to the storage file
-func SaveSecrets(secrets map[string]string, publicKeyPath, storagePath string) error {
+// SaveSecrets encrypts and saves secrets to the given backend.
+func SaveSecrets(secrets map[string]string, publicKeyPath string, b backend.Backend) error {
 	// Parse public key as recipient
 	recipient, err := crypto.ParseSSHPublicKey(publicKeyPath)
 	if err != nil {
@@ -67,29 +72,25 @@ func SaveSecrets(secrets map[string]string, publicKeyPath, storagePath string) e
 		return fmt.Errorf("failed to encrypt secrets: %w", err)
 	}
 
-	// Write encrypted file with locking
-	return crypto.WriteFileWithLock(storagePath, encryptedData, 0600)
+	// Write encrypted data
+	return b.Write(encryptedData)
 }
 
-// CreateEmptySecretsFile creates an empty encrypted secrets file
-func CreateEmptySecretsFile(secretsPath, publicKeyPath string) error {
+// CreateEmptyStorage creates an empty encrypted storage via the given backend.
+func CreateEmptyStorage(publicKeyPath string, b backend.Backend) error {
 	// Parse public key as recipient
 	recipient, err := crypto.ParseSSHPublicKey(publicKeyPath)
 	if err != nil {
 		return err
 	}
 
-	// Create empty secrets content
-	emptyContent := ""
-
-	// Encrypt the empty content
-	encryptedData, err := crypto.EncryptData(emptyContent, []age.Recipient{recipient})
+	// Encrypt empty content
+	encryptedData, err := crypto.EncryptData("", []age.Recipient{recipient})
 	if err != nil {
 		return fmt.Errorf("failed to encrypt empty secrets: %w", err)
 	}
 
-	// Write encrypted file with file locking
-	return crypto.WriteFileWithLock(secretsPath, encryptedData, 0600)
+	return b.Write(encryptedData)
 }
 
 // GetFilteredKeys returns a sorted list of keys that match the given path filter
