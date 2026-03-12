@@ -44,44 +44,6 @@ type ProfileConfig struct {
 	Storage        StorageConfig `yaml:"storage"`
 }
 
-// rawProfileConfig is used for backward-compatible YAML unmarshalling.
-type rawProfileConfig struct {
-	PublicKeyPath  string      `yaml:"public_key_path"`
-	PrivateKeyPath string      `yaml:"private_key_path"`
-	Storage        interface{} `yaml:"storage"`
-}
-
-// UnmarshalYAML supports both the legacy string format and the new struct format.
-func (p *ProfileConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var raw rawProfileConfig
-	if err := unmarshal(&raw); err != nil {
-		return err
-	}
-
-	p.PublicKeyPath = raw.PublicKeyPath
-	p.PrivateKeyPath = raw.PrivateKeyPath
-
-	switch v := raw.Storage.(type) {
-	case string:
-		// Legacy format: storage was a plain path string
-		if v != "" {
-			p.Storage.Local = &LocalStorageConfig{Path: v}
-		}
-	case map[string]interface{}:
-		// New structured format — re-marshal and unmarshal into StorageConfig
-		data, err := yaml.Marshal(v)
-		if err != nil {
-			return fmt.Errorf("failed to re-marshal storage config: %w", err)
-		}
-		if err := yaml.Unmarshal(data, &p.Storage); err != nil {
-			return fmt.Errorf("failed to parse storage config: %w", err)
-		}
-	case nil:
-		// No storage configured
-	}
-
-	return nil
-}
 
 // CrumbConfig represents the per-project configuration in .crumb.yaml
 type CrumbConfig struct {
