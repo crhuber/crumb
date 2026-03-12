@@ -133,10 +133,11 @@ func WriteFileWithLock(filePath string, data []byte, perm os.FileMode) error {
 	defer file.Close()
 
 	// Apply file lock
-	if err := unix.Flock(int(file.Fd()), unix.LOCK_EX); err != nil {
+	fd := int(file.Fd()) //nolint:gosec // file descriptors are small integers, no overflow risk
+	if err := unix.Flock(fd, unix.LOCK_EX); err != nil {
 		return fmt.Errorf("failed to lock file: %w", err)
 	}
-	defer unix.Flock(int(file.Fd()), unix.LOCK_UN)
+	defer unix.Flock(fd, unix.LOCK_UN)
 
 	_, err = file.Write(data)
 	if err != nil {
@@ -155,10 +156,11 @@ func ReadFileWithLock(filePath string) ([]byte, error) {
 	defer file.Close()
 
 	// Apply file lock
-	if err := unix.Flock(int(file.Fd()), unix.LOCK_SH); err != nil {
+	fd := int(file.Fd()) //nolint:gosec // file descriptors are small integers, no overflow risk
+	if err := unix.Flock(fd, unix.LOCK_SH); err != nil {
 		return nil, fmt.Errorf("failed to lock file: %w", err)
 	}
-	defer unix.Flock(int(file.Fd()), unix.LOCK_UN)
+	defer unix.Flock(fd, unix.LOCK_UN)
 
 	data, err := io.ReadAll(file)
 	if err != nil {

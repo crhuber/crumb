@@ -22,8 +22,8 @@ func StorageSetCommand(_ context.Context, cmd *cli.Command) error {
 	profile := getProfile(cmd)
 
 	// Load or create config
-	configDir := filepath.Join(os.Getenv("HOME"), ".config", "crumb")
-	configPath := filepath.Join(configDir, "config.yaml")
+	configDir := filepath.Clean(filepath.Join(os.Getenv("HOME"), ".config", "crumb"))
+	configPath := filepath.Clean(filepath.Join(configDir, "config.yaml"))
 
 	var cfg config.Config
 	if _, err := os.Stat(configPath); err == nil {
@@ -84,8 +84,8 @@ func StorageGetCommand(_ context.Context, cmd *cli.Command) error {
 func StorageClearCommand(_ context.Context, cmd *cli.Command) error {
 	profile := getProfile(cmd)
 
-	configDir := filepath.Join(os.Getenv("HOME"), ".config", "crumb")
-	configPath := filepath.Join(configDir, "config.yaml")
+	configDir := filepath.Clean(filepath.Join(os.Getenv("HOME"), ".config", "crumb"))
+	configPath := filepath.Clean(filepath.Join(configDir, "config.yaml"))
 
 	var cfg config.Config
 	if _, err := os.Stat(configPath); err != nil {

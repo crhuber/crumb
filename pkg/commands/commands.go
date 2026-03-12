@@ -23,12 +23,12 @@ func SetupCommand(_ context.Context, cmd *cli.Command) error {
 	profile := getProfile(cmd)
 
 	// Create ~/.config/crumb directory if it doesn't exist
-	configDir := filepath.Join(os.Getenv("HOME"), ".config", "crumb")
+	configDir := filepath.Clean(filepath.Join(os.Getenv("HOME"), ".config", "crumb"))
 	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	configPath := filepath.Join(configDir, "config.yaml")
+	configPath := filepath.Clean(filepath.Join(configDir, "config.yaml"))
 
 	// Prompt for SSH key paths
 	var defaultPublicKey, defaultPrivateKey string
@@ -119,7 +119,7 @@ func SetupCommand(_ context.Context, cmd *cli.Command) error {
 		storagePath = config.ExpandTilde(storagePath)
 
 		// Create storage directory if it doesn't exist
-		storageDir := filepath.Dir(storagePath)
+		storageDir := filepath.Clean(filepath.Dir(storagePath))
 		if err := os.MkdirAll(storageDir, 0700); err != nil {
 			return fmt.Errorf("failed to create storage directory: %w", err)
 		}

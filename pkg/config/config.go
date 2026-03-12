@@ -103,7 +103,7 @@ type TomlConfig struct {
 
 // LoadConfig loads the profile configuration from ~/.config/crumb/config.yaml
 func LoadConfig(profile string) (*ProfileConfig, error) {
-	configPath := filepath.Join(os.Getenv("HOME"), ".config", "crumb", "config.yaml")
+	configPath := filepath.Clean(filepath.Join(os.Getenv("HOME"), ".config", "crumb", "config.yaml"))
 
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("configuration not found. Run 'crumb setup' first")
@@ -131,8 +131,8 @@ func LoadConfig(profile string) (*ProfileConfig, error) {
 
 // SaveConfig saves the configuration to ~/.config/crumb/config.yaml
 func SaveConfig(config *Config) error {
-	configDir := filepath.Join(os.Getenv("HOME"), ".config", "crumb")
-	configPath := filepath.Join(configDir, "config.yaml")
+	configDir := filepath.Clean(filepath.Join(os.Getenv("HOME"), ".config", "crumb"))
+	configPath := filepath.Clean(filepath.Join(configDir, "config.yaml"))
 
 	// Create config directory if it doesn't exist
 	if err := os.MkdirAll(configDir, 0700); err != nil {
@@ -157,6 +157,7 @@ func SaveConfig(config *Config) error {
 
 // LoadCrumbConfig loads the per-project configuration from .crumb.yaml
 func LoadCrumbConfig(configFileName string) (*CrumbConfig, error) {
+	configFileName = filepath.Clean(configFileName)
 	// Check if config file exists
 	if _, err := os.Stat(configFileName); os.IsNotExist(err) {
 		return nil, fmt.Errorf("no %s found", configFileName)
@@ -317,7 +318,7 @@ func PromptForSecret(prompt string) (string, error) {
 
 // LoadTomlConfig loads the TOML configuration from ~/.config/crumb/crumb.toml
 func LoadTomlConfig() (*TomlConfig, error) {
-	configPath := filepath.Join(os.Getenv("HOME"), ".config", "crumb", "crumb.toml")
+	configPath := filepath.Clean(filepath.Join(os.Getenv("HOME"), ".config", "crumb", "crumb.toml"))
 
 	// If file doesn't exist, return empty config (not an error)
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {

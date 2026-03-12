@@ -355,7 +355,7 @@ func BenchmarkParseSecrets(b *testing.B) {
 	// Create a large secrets string
 	var buf bytes.Buffer
 	for i := 0; i < 1000; i++ {
-		buf.WriteString(fmt.Sprintf("/prod/service%d/vars/key%d=value%d\n", i%10, i, i))
+		fmt.Fprintf(&buf, "/prod/service%d/vars/key%d=value%d\n", i%10, i, i)
 	}
 	content := buf.String()
 
