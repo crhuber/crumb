@@ -178,9 +178,9 @@ func ListCommand(_ context.Context, cmd *cli.Command) error {
 
 // SetCommand handles the set command
 func SetCommand(_ context.Context, cmd *cli.Command) error {
-	// Check arguments - only key path is required
-	if cmd.Args().Len() != 1 {
-		return fmt.Errorf("usage: crumb set <key-path>")
+	// Check arguments - key path is required, value is optional
+	if cmd.Args().Len() < 1 || cmd.Args().Len() > 2 {
+		return fmt.Errorf("usage: crumb set <key-path> [value]")
 	}
 
 	keyPath := cmd.Args().Get(0)
@@ -217,10 +217,16 @@ func SetCommand(_ context.Context, cmd *cli.Command) error {
 		os.Stdout.Sync()
 	}
 
-	// Prompt for the secret value (not echoed to terminal)
-	value, err := config.PromptForSecret("Enter secret value: ")
-	if err != nil {
-		return err
+	// Get the secret value: from argument if provided, otherwise prompt
+	var value string
+	if cmd.Args().Len() == 2 {
+		value = cmd.Args().Get(1)
+	} else {
+		// Prompt for the secret value (not echoed to terminal)
+		value, err = config.PromptForSecret("Enter secret value: ")
+		if err != nil {
+			return err
+		}
 	}
 
 	// Validate that value is not empty

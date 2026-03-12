@@ -56,7 +56,7 @@ func main() {
 				Name:      "set",
 				Usage:     "Add or update a secret key-value pair",
 				Action:    commands.SetCommand,
-				ArgsUsage: "<key-path>",
+				ArgsUsage: "<key-path> [value]",
 			},
 			{
 				Name:      "get",
