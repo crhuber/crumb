@@ -10,14 +10,36 @@
 - [Sops](https://github.com/getsops/sops)
 - [Direnv](https://direnv.net/)
 - [SecretSpec](https://devenv.sh/blog/2025/07/21/announcing-secretspec-declarative-secrets-management/)
+- [Fnox](https://github.com/jdx/fnox)
+- [Scrt](https://scrt.run/)
 
 but, designed for the non-enterprise developer without access to a cloud Secrets Manager, raft storage, etc. Crumb was born out of the need to be able to switch secrets between different projects, without leaving project secrets unencrypted on disk.
+
+## Quick Start
+
+```bash
+# 1. Install crumb
+kelp add crhuber/crumb --install
+
+# 2. Initialize your secret store (uses your existing SSH keys)
+crumb setup
+
+# 3. Store a secret
+crumb set /myapp/api_key
+# Enter secret value: [hidden]
+
+# 4. Retrieve it
+crumb get /myapp/api_key
+
+# 5. Export secrets as environment variables
+eval "$(crumb export --path /myapp)"
+```
 
 ## Features
 
 - **SSH Key Encryption/Decryption**: Securely encrypt your password storage file using SSH Keys
 - **S3 Storage Backend**: Store encrypted secrets in AWS S3 or S3-compatible services (MinIO, LocalStack)
-- **Bulk Export**: Exports multiple secrets from an entire path like `/app/prod/`
+- **Bulk Export**: Exports multiple secrets from an entire path like `/myapp/dev/`
 - **Multi-Profile Support**: Manage separate secret stores for work, personal, or different projects
 - **.env Import**: Import multiple secrets from `.env` files
 - **Shell Integration**: Automatic secret loading with shell hooks (bash, zsh, fish)
@@ -44,13 +66,6 @@ The `setup` command initializes the secure storage backend for a specific profil
 crumb setup [--profile <profile-name>]
 ```
 
-This command:
-- Creates a directory at `~/.config/crumb/` if it doesn't exist
-- Creates or updates `~/.config/crumb/config.yaml` with the profile configuration
-- Prompts for your SSH public key path (e.g., `~/.ssh/id_ed25519.pub`)
-- Prompts for your SSH private key path (e.g., `~/.ssh/id_ed25519`)
-- Creates an empty encrypted secrets file at the specified storage location
-
 #### Prerequisites
 
 Before running setup, you need to have SSH keys generated. If you don't have them, create them with:
@@ -58,36 +73,18 @@ Before running setup, you need to have SSH keys generated. If you don't have the
 ```bash
 # For Ed25519 keys (recommended)
 ssh-keygen -t ed25519 -C "your_email@example.com"
-
-# For RSA keys
-ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
 ```
 
 #### Example Setup Sessions
 
-**Default profile setup:**
+**Default setup:**
 ```bash
 $ crumb setup
-Enter path to SSH public key (e.g., ~/.ssh/id_ed25519.pub): ~/.ssh/id_ed25519.pub
-Enter path to SSH private key (e.g., ~/.ssh/id_ed25519): ~/.ssh/id_ed25519
-Setup completed successfully for profile 'default'!
-Config file: /Users/username/.config/crumb/config.yaml
-Storage file: /Users/username/.config/crumb/secrets
 ```
 
 **Setup with S3 storage:**
 ```bash
-$ crumb setup --storage s3 --s3-bucket my-secrets-bucket --s3-key /crumb/production.enc
-Enter path to SSH public key (e.g., ~/.ssh/id_ed25519.pub): ~/.ssh/id_ed25519.pub
-Enter path to SSH private key (e.g., ~/.ssh/id_ed25519): ~/.ssh/id_ed25519
-Setup completed successfully for profile 'default'!
-Config file: /Users/username/.config/crumb/config.yaml
-Storage: s3://my-secrets-bucket//crumb/production.enc
-```
-
-**Setup with S3-compatible endpoint (MinIO, LocalStack):**
-```bash
-$ crumb setup --storage s3 --s3-bucket local-bucket --s3-key /secrets.enc --s3-endpoint-url http://localhost:9000
+$ crumb setup --storage s3 --s3-bucket my-secrets-bucket --s3-key /crumb/secrets
 ```
 
 **Setup with non default profile**
@@ -104,27 +101,21 @@ The `set` command adds or updates a secret key-value pair. The value is entered 
 crumb set <key-path>
 ```
 
-This command:
-- Validates the key path (must start with `/`, no spaces or special characters)
-- Decrypts the secrets file using the private key
-- Checks if the key already exists and prompts for confirmation if it does
-- Adds or updates the key-value pair
-- Re-encrypts and saves the secrets file
 
 #### Example Usage
 
 ```bash
 # Add a new secret
-$ crumb set /prod/api_key
+$ crumb set /myapp/api_key
 Enter secret value: [secret not shown]
-Successfully set key: /prod/api_key
+Successfully set key: /myapp/api_key
 
 # Update an existing secret (with confirmation)
-$ crumb set /prod/api_key
-Key '/prod/api_key' already exists.
+$ crumb set /myapp/api_key
+Key '/myapp/api_key' already exists.
 key already exists. Overwrite? (y/n): y
 Enter secret value: [secret not shown]
-Successfully set key: /prod/api_key
+Successfully set key: /myapp/api_key
 ```
 
 
@@ -136,9 +127,6 @@ The `ls` command lists all stored secret keys, optionally filtered by path.
 crumb ls [path]
 ```
 
-This command:
-- Decrypts the secrets file using the private key
-- Displays all secret keys (not values) in sorted order
 
 #### Example Usage
 
@@ -149,9 +137,9 @@ $ crumb ls
 /any/path/mykey
 
 # Filter by path prefix
-$ crumb ls /prod
-/prod/api_key
-/prod/auth-svc/secret
+$ crumb ls /myapp
+/myapp/api_key
+/myapp/auth-svc/secret
 ```
 
 
@@ -163,38 +151,28 @@ The `get` command retrieves a secret by its key path.
 crumb get <key-path> [--show] [--export] [--shell=bash|fish]
 ```
 
-This command:
-- Validates the key path (must start with `/`, no spaces or special characters)
-- Decrypts the secrets file using the private key
-- By default, displays `****` to mask the value (unless `show_values = true` in TOML config)
-- Supports `--show` flag to display the actual secret value
-- The `--show` flag can be set as default via `show_values = true` in `~/.config/crumb/crumb.toml`
-- Supports `--export` flag to output in shell-compatible format for sourcing
-- Supports `--shell` flag to select output format when using `--export` (bash or fish, defaulting to bash)
-- When `--export` is used, `--show` is ignored and the secret value is always displayed
-- Requires a full key path (partial paths are not supported)
 
 #### Example Usage
 
 ```bash
-# Get a secret (masked value)
-$ crumb get /prod/api_key
-****
-
-# Get a secret with actual value
-$ crumb get /prod/api_key --show
+# Get a secret
+$ crumb get /myapp/api_key
 secret123
 
+# Get a secret masked
+$ crumb get /myapp/api_key --mask
+***
+
 # Export a secret for bash sourcing
-$ crumb get /prod/api_key --export
+$ crumb get /myapp/api_key --export
 export API_KEY=secret123
 
 # Export a secret for fish shell
-$ crumb get /prod/api_key --export --shell fish
+$ crumb get /myapp/api_key --export --shell fish
 set -x API_KEY secret123
 
 # Source the export directly in bash
-$ eval "$(crumb get /prod/api_key --export)"
+$ eval "$(crumb get /myapp/api_key --export)"
 $ echo $API_KEY
 secret123
 ```
@@ -209,8 +187,7 @@ When using the `--export` flag, the key path is automatically converted to a val
 - The result is converted to uppercase
 
 Examples:
-- `/api/key` → `API_KEY`
-- `/prod/my-service/auth-token` → `AUTH_TOKEN`
+- `/myapp/my-service/auth-token` → `AUTH_TOKEN`
 
 
 #### Shell Integration
@@ -220,22 +197,22 @@ The `--export` flag makes it easy to integrate secrets into shell scripts and wo
 **Bash:**
 ```bash
 # Source a single secret
-eval "$(crumb get /api/key --export)"
+eval "$(crumb get /myapp/key --export)"
 echo "Key: $KEY"
 
 # Source multiple secrets in a script
 #!/bin/bash
-eval "$(crumb get /prod/  --export)"
+eval "$(crumb get /myapp/  --export)"
 ```
 
 **Fish:**
 ```fish
 # Source a single secret
-eval (crumb get /api/key --export --shell fish)
+eval (crumb get /myapp/key --export --shell fish)
 echo "Key: $KEY"
 
 # Source multiple secrets
-eval (crumb get /prod/ --export --shell fish)
+eval (crumb get /myapp/ --export --shell fish)
 ```
 
 ### Init Command
@@ -245,12 +222,6 @@ The `init` command creates a YAML configuration file in the current project dire
 ```bash
 crumb init
 ```
-
-This command:
-- Creates a `.crumb.yaml` file in the current directory
-- Uses a default structure with empty configuration
-- Prompts for confirmation if the file already exists
-- Validates the YAML structure before writing
 
 #### Example Usage
 
@@ -273,7 +244,7 @@ environments:
 ```
 
 This structure allows you to configure multiple environments, each with:
-- `path`: A path to sync secrets from (e.g., `/prod/billing-svc`)
+- `path`: A path to sync secrets from (e.g., `/myapp/api-key`)
 - `remap`: Key remapping for environment variables
 - `env`: Individual environment variable configurations
 
@@ -302,7 +273,7 @@ You can change what finally gets exported to shell by using the `remap` section 
 version: "1.0"
 environments:
   default:
-    path: "/some/path"
+    path: "/myapp/dev"
     remap:
       "FROM": "TO"
     env: {}
@@ -313,7 +284,7 @@ For example:
 version: "1.0"
 environments:
   default:
-    path: "/some/path"
+    path: "/myapp/dev"
     remap:
       "SOME_SECRET_KEY": "MY_KEY"
     env: {}
@@ -337,9 +308,9 @@ crumb delete <key-path>
 
 ```bash
 # Delete a secret (with confirmation)
-$ crumb delete /prod/billing-svc/vars/mg
-Type the key path to confirm deletion: /prod/billing-svc/vars/mg
-Successfully deleted key: /prod/billing-svc/vars/mg
+$ crumb delete /myapp/dev/api_key
+Type the key path to confirm deletion: /myapp/dev/api_key
+Successfully deleted key: /myapp/dev/api_key
 ```
 
 ### Move Command
@@ -361,11 +332,6 @@ The `import` command allows you to import multiple secrets from a `.env` file in
 crumb import --file <path-to-env-file> --path <destination-path>
 ```
 
-This command:
-- Parses a `.env` file to extract environment variables and their values
-- Imports all variables as individual secrets under the specified path
-- Re-encrypts and saves the secrets file
-
 #### .env File Format Support
 
 The import command supports standard `.env` file formats:
@@ -375,9 +341,6 @@ The import command supports standard `.env` file formats:
 API_KEY=secret123
 DATABASE_URL="postgresql://localhost:5432/mydb"
 DEBUG=true
-EMPTY_VAR=
-QUOTED_VALUE='single-quoted-value'
-COMPLEX_URL=https://api.example.com?token=abc123&refresh=def456
 ```
 
 #### Example Usage
@@ -392,18 +355,18 @@ REDIS_URL=redis://localhost:6379
 DEBUG=true
 EOF
 
-# Import to /dev/myapp path
-$ crumb import --file .env --path /dev/myapp
+# Import to /myapp/dev path
+$ crumb import --file .env --path /myapp/dev
 Found 4 environment variables in .env
 New keys to import: 4
-Successfully imported 4 secrets from .env to /dev/myapp
+Successfully imported 4 secrets from .env to /myapp/dev
 
 # Verify the imported secrets
-$ crumb ls /dev/myapp
-/dev/myapp/API_KEY
-/dev/myapp/DATABASE_URL
-/dev/myapp/DEBUG
-/dev/myapp/REDIS_URL
+$ crumb ls /myapp/dev
+/myapp/dev/API_KEY
+/myapp/dev/DATABASE_URL
+/myapp/dev/DEBUG
+/myapp/dev/REDIS_URL
 ```
 
 **Using with different profiles:**
@@ -481,7 +444,7 @@ You can maintain separate secret stores for different contexts (work, personal, 
 crumb --profile work setup
 
 # Add secrets to different profiles
-crumb --profile work set /api/key
+crumb --profile work set /myapp/key
 # Enter "work-secret" when prompted
 
 # List secrets by profile
@@ -543,7 +506,7 @@ $ crumb export --env staging
 
 # Export for fish shell
 $ crumb export --shell fish
-# Exported from /prod/billing-svc (environment: default)
+# Exported from /myapp/api-key (environment: default)
 set -x API_SECRET secret123
 set -x DATABASE_URL postgres://user:pass@localhost/db
 set -x MG_KEY mgsecret
@@ -551,23 +514,23 @@ set -x STRIPE_KEY stripesecret
 
 # Use a custom config file
 $ crumb export -f my-project.yaml
-# Exported from /prod/my-project
+# Exported from /myapp/my-project
 export MY_SECRET=value123
 
 # Use custom config file
 $ crumb export --file my-project.yaml --shell fish
-# Exported from /prod/my-project
+# Exported from /myapp/my-project
 set -x MY_SECRET value123
 
 # Export from work profile
 $ crumb export --profile work
-# Exported from /prod/billing-svc
+# Exported from /myapp/api-key
 export WORK_API_KEY=work-secret
 export WORK_DB_URL=postgres://work-db
 
 # Use environment variable for profile
 $ CRUMB_PROFILE=work crumb export --shell=fish
-# Exported from /prod/billing-svc
+# Exported from /myapp/api-key
 set -x WORK_API_KEY work-secret
 set -x WORK_DB_URL postgres://work-db
 
@@ -594,8 +557,8 @@ set -x CLIENT foo
 set -x CLIENT_SECRET bar
 
 # Use with different profile
-$ crumb export --path /prod/api --profile production
-# Exported from /prod/api
+$ crumb export --path /myapp/api --profile myappuction
+# Exported from /myapp/api
 export API_KEY=secret123
 export SERVICE_TOKEN=token456
 
@@ -713,14 +676,6 @@ profiles:
     storage:
       local:
         path: ~/.config/crumb/work-secrets
-  production:
-    public_key_path: ~/.ssh/prod.pub
-    private_key_path: ~/.ssh/prod
-    storage:
-      s3:
-        bucket: my-secrets-bucket
-        key: /crumb/production.enc
-        endpoint_url: ""  # optional, for MinIO etc.
 ```
 
 ### Storage Files
@@ -785,18 +740,18 @@ $ crumb hook --shell bash
 # Uses bash despite TOML config
 
 # With show_values = true in TOML config
-$ crumb get /api/key
+$ crumb get /myapp/key
 my_secret_value
 # Shows actual value without needing --show flag
 
 # With show_values = false (or not set) in TOML config
-$ crumb get /api/key
-****
+$ crumb get /myapp/key
+my_secret_value
 # Masks the value
 
 # CLI flag overrides TOML config
-$ crumb get /api/key --show
-my_secret_value
+$ crumb get /myapp/key --mask
+****
 # Always shows value when --show flag is used
 ```
 
