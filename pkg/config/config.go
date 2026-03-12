@@ -44,7 +44,6 @@ type ProfileConfig struct {
 	Storage        StorageConfig `yaml:"storage"`
 }
 
-
 // CrumbConfig represents the per-project configuration in .crumb.yaml
 type CrumbConfig struct {
 	Version      string                       `yaml:"version"`
