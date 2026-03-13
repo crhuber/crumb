@@ -196,6 +196,16 @@ func main() {
 						Usage:  "Clear storage file path for current profile (use default)",
 						Action: commands.StorageClearCommand,
 					},
+					{
+						Name:   "show",
+						Usage:  "Display all secrets in plain text",
+						Action: commands.StorageShowCommand,
+					},
+					{
+						Name:   "edit",
+						Usage:  "Edit secrets in your default editor",
+						Action: commands.StorageEditCommand,
+					},
 				},
 			},
 		},

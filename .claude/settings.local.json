@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(task build)",
-      "Bash(task test:*)"
+      "Bash(task test:*)",
+      "Bash(go build:*)",
+      "Bash(go test:*)",
+      "Bash(task lint:*)"
     ],
     "deny": [],
     "ask": []
