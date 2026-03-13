@@ -138,13 +138,12 @@ crumb ls [path]
 ```bash
 # List all secrets
 $ crumb ls
-/any/other/mykey
-/any/path/mykey
+/myapp/dev/api_key
 
 # Filter by path prefix
 $ crumb ls /myapp
 /myapp/api_key
-/myapp/auth-svc/secret
+/myapp/secret
 ```
 
 
@@ -214,7 +213,6 @@ eval "$(crumb get /myapp/  --export)"
 ```fish
 # Source a single secret
 eval (crumb get /myapp/key --export --shell fish)
-echo "Key: $KEY"
 
 # Source multiple secrets
 eval (crumb get /myapp/ --export --shell fish)
@@ -259,42 +257,14 @@ You can add additional environments for different deployment contexts:
 version: "1.0"
 environments:
   default:
-    path: "/myapp/dev"
+    path: "/myapp/dev/"
     remap: {}
-    env:
-      FOO: "bar"
+    env: {}
   production:
-    path: "/myapp/prod"
+    path: "/myapp/prod/"
     remap: {}
-    env:
-      FOO: "baz"
-```
-
-#### Remapping Keys
-
-You can change what finally gets exported to shell by using the `remap` section within an environment:
-
-```yaml
-version: "1.0"
-environments:
-  default:
-    path: "/myapp/dev"
-    remap:
-      "FROM": "TO"
     env: {}
 ```
-
-For example:
-```yaml
-version: "1.0"
-environments:
-  default:
-    path: "/myapp/dev"
-    remap:
-      "SOME_SECRET_KEY": "MY_KEY"
-    env: {}
-```
-will result in SOME_SECRET_KEY being exported as MY_KEY
 
 ```bash
 export MY_KEY=******
@@ -352,32 +322,17 @@ DEBUG=true
 
 **Basic import:**
 ```bash
-# Create a .env file
-$ cat > .env << EOF
-API_KEY=secret123
-DATABASE_URL="postgresql://localhost:5432/mydb"
-REDIS_URL=redis://localhost:6379
-DEBUG=true
-EOF
-
 # Import to /myapp/dev path
-$ crumb import --file .env --path /myapp/dev
-Found 4 environment variables in .env
-New keys to import: 4
-Successfully imported 4 secrets from .env to /myapp/dev
+$ crumb import --file .env --path /myapp/dev/
 
 # Verify the imported secrets
-$ crumb ls /myapp/dev
-/myapp/dev/API_KEY
-/myapp/dev/DATABASE_URL
-/myapp/dev/DEBUG
-/myapp/dev/REDIS_URL
+$ crumb ls /myapp/dev/
 ```
 
 **Using with different profiles:**
 ```bash
 # Import to work profile
-$ crumb --profile work import --file work.env --path /work/secrets
+$ crumb --profile work import --file work.env --path /work/secrets/
 ```
 
 ### Storage Management Commands
@@ -396,11 +351,9 @@ Example:
 ```bash
 # Set storage path for work profile
 $ crumb --profile work storage set ~/.config/crumb/work-secrets
-Storage path set to: /Users/username/.config/crumb/work-secrets (profile: work)
 
 # Set storage path for default profile
 $ crumb storage set ~/personal-secrets
-Storage path set to: /Users/username/personal-secrets (profile: default)
 ```
 
 #### Storage Get
@@ -483,66 +436,37 @@ First, create a `.crumb.yaml` configuration file:
 version: "1.0"
 environments:
   default:
-    path: "/myapp/dev"
-    remap:
-      DEFAULT_SECRET: "SECRET"
-    env:
-      MESSAGE: "Hello default"
-  staging:
-    path: "/myapp/staging"
-    remap:
-      STAGING_SECRET: "SECRET"
-    env:
-      MESSAGE: "Hello staging"
+    path: "/myapp/dev/"
+    remap: {}
+    env: {}
 ```
 
 Then export the secrets:
 
 ```bash
-# Export default environment for bash (default)
+# Export default environment
 $ crumb export
-# Exported from /myapp/dev (environment: default)
-export API_SECRET=secret123
-export MESSAGE=Hello default
-export SECRET=somesecret
 
 # Export staging environment
 $ crumb export --env staging
 
 # Export for fish shell
 $ crumb export --shell fish
-# Exported from /myapp/api-key (environment: default)
-set -x API_SECRET secret123
-set -x DATABASE_URL postgres://user:pass@localhost/db
-set -x MG_KEY mgsecret
-set -x STRIPE_KEY stripesecret
 
 # Use a custom config file
 $ crumb export -f my-project.yaml
-# Exported from /myapp/my-project
-export MY_SECRET=value123
 
 # Use custom config file
 $ crumb export --file my-project.yaml --shell fish
-# Exported from /myapp/my-project
-set -x MY_SECRET value123
 
 # Export from work profile
 $ crumb export --profile work
-# Exported from /myapp/api-key
-export WORK_API_KEY=work-secret
-export WORK_DB_URL=postgres://work-db
 
 # Use environment variable for profile
 $ CRUMB_PROFILE=work crumb export --shell=fish
-# Exported from /myapp/api-key
-set -x WORK_API_KEY work-secret
-set -x WORK_DB_URL postgres://work-db
 
 # Source the output directly
-$ source <(crumb export)
-$ echo $MG_KEY
-mgsecret
+$ eval "$(crumb export)"
 
 #### Direct Path Export Examples
 
@@ -550,31 +474,68 @@ The `--path` flag allows you to export secrets directly without a `.crumb.yaml` 
 
 ```bash
 # Export all secrets from /api path
-$ crumb export --path /api
-# Exported from /api
-export CLIENT=foo
-export CLIENT_SECRET=bar
+$ crumb export --path /myapp/dev/
 
 # Export with fish shell format
-$ crumb export --path /api --shell fish
-# Exported from /api
-set -x CLIENT foo
-set -x CLIENT_SECRET bar
+$ crumb export --path /myapp/dev/ --shell fish
 
 # Use with different profile
-$ crumb export --path /myapp/api --profile myappuction
-# Exported from /myapp/api
-export API_KEY=secret123
-export SERVICE_TOKEN=token456
+$ crumb export --path /myapp/dev/ --profile work
 
 # Source directly into shell
-$ eval "$(crumb export --path /api)"
+$ eval "$(crumb export --path /myapp/)"
 ```
 
 **Path to Variable Name Conversion**:
 - Only the final segment (actual secret name) is used, intermediate path segments are ignored
 - Hyphens in the secret name are converted to underscores, and the result is uppercase
 mgsecret
+
+
+#### Remapping Keys
+
+You can change what finally gets exported to shell by using the `remap` section within an environment:
+
+```yaml
+version: "1.0"
+environments:
+  default:
+    path: "/myapp/dev/"
+    remap:
+      "FROM": "TO"
+```
+
+For example:
+```yaml
+version: "1.0"
+environments:
+  default:
+    path: "/myapp/dev/"
+    remap:
+      "SOME_SECRET_KEY": "MY_KEY"
+```
+will result in SOME_SECRET_KEY being exported as MY_KEY
+
+#### Manually Setting Environment Varables
+
+Say you want to also export a variable that isnt in your secrets file you can do so by adding it in the `env` key.
+
+```yaml
+environments:
+  default:
+    ...
+    env:
+      MESSAGE: "Hello staging"
+```
+If you want to load a single secret from a key you can do it like this:
+
+```yaml
+environments:
+  default:
+    ...
+    env:
+      API_KEY: "/myapp/staging/api_key"
+```
 
 
 ### Hook Command
@@ -621,7 +582,7 @@ Once the hook is installed:
 
 ```bash
 # 1. Create a project with secrets
-$ mkdir myproject && cd myproject
+$ mkdir myapp && cd myapp
 $ crumb init
 
 # 2. Edit .crumb.yaml to configure your secrets
@@ -629,20 +590,20 @@ $ cat > .crumb.yaml << EOF
 version: "1.0"
 environments:
   default:
-    path: "/myproject/dev"
+    path: "/myapp/dev"
     env: {}
     remap: {}
 EOF
 
 # 3. Add some secrets to crumb
-$ crumb set /myproject/dev/API_KEY
+$ crumb set /myapp/dev/API_KEY
 Enter secret value: ********
 
-$ crumb set /myproject/dev/DATABASE_URL
+$ crumb set /myapp/dev/DATABASE_URL
 Enter secret value: ********
 
 # 4. With the hook installed, cd into the directory
-$ cd myproject
+$ cd myapp
 # Secrets are automatically loaded!
 
 $ echo $API_KEY
@@ -689,35 +650,20 @@ Each profile has its own encrypted storage file:
 - Default profile: `~/.config/crumb/secrets` (unless customized)
 - Named profiles: Configurable per profile (e.g., `~/.config/crumb/work-secrets`)
 
-### User Preferences (Optional)
+### User Preferences
 
 `~/.config/crumb/crumb.toml` - Optional TOML configuration file for user preferences.
 
 **Shell configuration:**
 ```toml
-# Specifies the default shell format for get, export, and hook commands
-# Supported values: "bash", "fish", "zsh"
-# Default: "bash"
-shell = "bash"
+shell = "bash". # Supported values: "bash", "fish", "zsh". Default: "bash"
+mask_values = true
 ```
-
-This allows you to set a default shell format without specifying `--shell` on every command.
 
 **Priority order for shell configuration:**
 1. Command-line flag (e.g., `crumb hook --shell fish`)
 2. TOML config file (`~/.config/crumb/crumb.toml`)
 3. Default value (`bash`)
-
-
-
-**Example configuration file:**
-```toml
-# ~/.config/crumb/crumb.toml
-shell = "fish"
-mask_values = true
-```
-
-
 
 ## Development
 
