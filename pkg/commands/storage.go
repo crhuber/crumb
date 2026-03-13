@@ -209,8 +209,8 @@ func StorageEditCommand(_ context.Context, cmd *cli.Command) error {
 	}
 	tmpFile.Close()
 
-	// Open editor
-	editorCmd := exec.Command(editor, tmpPath)
+	// Open editor — editor is sourced from the user's own $EDITOR/$VISUAL env var
+	editorCmd := exec.Command(editor, tmpPath) // #nosec G702 -- intentionally executing user-configured editor
 	editorCmd.Stdin = os.Stdin
 	editorCmd.Stdout = os.Stdout
 	editorCmd.Stderr = os.Stderr
