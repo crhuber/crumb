@@ -13,7 +13,12 @@
 - [Fnox](https://github.com/jdx/fnox)
 - [Scrt](https://scrt.run/)
 
-but, designed for the non-enterprise developer without access to a cloud Secrets Manager, raft storage, etc. Crumb was born out of the need to be able to switch secrets between different projects, without leaving project secrets unencrypted on disk.
+but, designed for the non-enterprise developer without access to a cloud Secrets Manager, raft storage, etc. Crumb was born out of the need to be able to load secrets without leaving ecrets unencrypted on disk.
+
+## How it works
+crumb keeps all your secrets inside a single file encryped with an ssh key.
+
+When getting on your secrets, crumb loads the file into memory, decrypts the payload, creates, retrieves or updates secrets, and, if necessary, encrypts the changes back to the store. Each secret is referenced by a path.
 
 ## Quick Start
 
@@ -148,7 +153,7 @@ $ crumb ls /myapp
 The `get` command retrieves a secret by its key path.
 
 ```bash
-crumb get <key-path> [--show] [--export] [--shell=bash|fish]
+crumb get <key-path> [--mask] [--export] [--shell=bash|fish]
 ```
 
 
@@ -161,7 +166,7 @@ secret123
 
 # Get a secret masked
 $ crumb get /myapp/api_key --mask
-***
+****
 
 # Export a secret for bash sourcing
 $ crumb get /myapp/api_key --export
@@ -703,57 +708,15 @@ This allows you to set a default shell format without specifying `--shell` on ev
 2. TOML config file (`~/.config/crumb/crumb.toml`)
 3. Default value (`bash`)
 
-**Show values configuration:**
-```toml
-# Display actual secret values by default in get command
-# When true, behaves as if --show flag is always set
-# Default: false
-show_values = true
-```
 
-This allows you to configure whether the `get` command shows actual secret values or masks them by default.
-
-**Priority order for show values:**
-1. Command-line flag (e.g., `crumb get /key --show`)
-2. TOML config file (`~/.config/crumb/crumb.toml`)
-3. Default value (masked - `****`)
 
 **Example configuration file:**
 ```toml
 # ~/.config/crumb/crumb.toml
 shell = "fish"
-show_values = true
+mask_values = true
 ```
 
-**Example usage:**
-
-```bash
-# Without TOML config - must specify shell flag
-$ crumb hook --shell fish
-
-# With TOML config (shell = "fish")
-$ crumb hook
-# Automatically uses fish shell from config
-
-# CLI flag still overrides TOML config
-$ crumb hook --shell bash
-# Uses bash despite TOML config
-
-# With show_values = true in TOML config
-$ crumb get /myapp/key
-my_secret_value
-# Shows actual value without needing --show flag
-
-# With show_values = false (or not set) in TOML config
-$ crumb get /myapp/key
-my_secret_value
-# Masks the value
-
-# CLI flag overrides TOML config
-$ crumb get /myapp/key --mask
-****
-# Always shows value when --show flag is used
-```
 
 
 ## Development

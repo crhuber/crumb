@@ -79,9 +79,9 @@ func main() {
 				ArgsUsage: "<key-path>",
 				Flags: []cli.Flag{
 					&cli.BoolFlag{
-						Name:    "show",
-						Usage:   "Display the actual secret value instead of masking it",
-						Sources: cli.NewValueSourceChain(config.NewTomlValueSource("show")),
+						Name:    "mask",
+						Usage:   "Mask the secret value with ****",
+						Sources: cli.NewValueSourceChain(config.NewTomlValueSource("mask")),
 					},
 					&cli.BoolFlag{
 						Name:  "export",

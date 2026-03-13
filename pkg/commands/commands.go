@@ -282,7 +282,7 @@ func GetCommand(_ context.Context, cmd *cli.Command) error {
 	}
 
 	keyPath := cmd.Args().Get(0)
-	showValue := cmd.Bool("show")
+	maskValue := cmd.Bool("mask")
 	exportFormat := cmd.Bool("export")
 	shell := cmd.String("shell")
 
@@ -321,10 +321,10 @@ func GetCommand(_ context.Context, cmd *cli.Command) error {
 		return nil
 	}
 
-	if showValue {
-		fmt.Printf("%s\n", value)
-	} else {
+	if maskValue {
 		fmt.Println("****")
+	} else {
+		fmt.Printf("%s\n", value)
 	}
 
 	return nil

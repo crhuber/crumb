@@ -26,8 +26,8 @@ func (t *TomlValueSource) Lookup() (string, bool) {
 		return config.Shell, true
 	}
 
-	// Support "show" key for show_values boolean
-	if t.key == "show" && config.ShowValues {
+	// Support "mask" key for mask_values boolean
+	if t.key == "mask" && config.MaskValues {
 		return "true", true
 	}
 

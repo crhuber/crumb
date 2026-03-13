@@ -59,7 +59,7 @@ type EnvironmentConfig struct {
 // TomlConfig represents the TOML configuration in ~/.config/crumb/crumb.toml
 type TomlConfig struct {
 	Shell      string `toml:"shell"`
-	ShowValues bool   `toml:"show_values"`
+	MaskValues bool   `toml:"mask_values"`
 }
 
 // LoadConfig loads the profile configuration from ~/.config/crumb/config.yaml

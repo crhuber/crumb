@@ -246,7 +246,7 @@ func TestTomlValueSourceNoConfig(t *testing.T) {
 	}
 }
 
-func TestTomlValueSourceShowValues(t *testing.T) {
+func TestTomlValueSourceMaskValues(t *testing.T) {
 	// Create a temporary directory for test config
 	tempDir, err := os.MkdirTemp("", "crumb_toml_test")
 	if err != nil {
@@ -273,36 +273,36 @@ func TestTomlValueSourceShowValues(t *testing.T) {
 		expectedFound bool
 	}{
 		{
-			name:          "show_values true",
-			tomlContent:   `show_values = true`,
-			key:           "show",
+			name:          "mask_values true",
+			tomlContent:   `mask_values = true`,
+			key:           "mask",
 			expectedValue: "true",
 			expectedFound: true,
 		},
 		{
-			name:          "show_values false",
-			tomlContent:   `show_values = false`,
-			key:           "show",
+			name:          "mask_values false",
+			tomlContent:   `mask_values = false`,
+			key:           "mask",
 			expectedValue: "",
 			expectedFound: false,
 		},
 		{
-			name:          "show_values not set",
+			name:          "mask_values not set",
 			tomlContent:   ``,
-			key:           "show",
+			key:           "mask",
 			expectedValue: "",
 			expectedFound: false,
 		},
 		{
-			name:          "both shell and show_values",
-			tomlContent:   "shell = \"fish\"\nshow_values = true",
-			key:           "show",
+			name:          "both shell and mask_values",
+			tomlContent:   "shell = \"fish\"\nmask_values = true",
+			key:           "mask",
 			expectedValue: "true",
 			expectedFound: true,
 		},
 		{
-			name:          "both shell and show_values - lookup shell",
-			tomlContent:   "shell = \"fish\"\nshow_values = true",
+			name:          "both shell and mask_values - lookup shell",
+			tomlContent:   "shell = \"fish\"\nmask_values = true",
 			key:           "shell",
 			expectedValue: "fish",
 			expectedFound: true,

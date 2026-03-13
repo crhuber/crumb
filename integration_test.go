@@ -566,9 +566,9 @@ func TestExportCommandDiffOutput(t *testing.T) {
 	})
 }
 
-func TestGetCommandWithTomlShowValues(t *testing.T) {
+func TestGetCommandWithTomlMaskValues(t *testing.T) {
 	// Create a temporary directory for test config
-	tempDir, err := os.MkdirTemp("", "crumb_get_show_test")
+	tempDir, err := os.MkdirTemp("", "crumb_get_mask_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -588,27 +588,27 @@ func TestGetCommandWithTomlShowValues(t *testing.T) {
 	tests := []struct {
 		name               string
 		tomlContent        string
-		expectShowBehavior bool
+		expectMaskBehavior bool
 	}{
 		{
-			name:               "show_values true in toml",
-			tomlContent:        "show_values = true",
-			expectShowBehavior: true,
+			name:               "mask_values true in toml",
+			tomlContent:        "mask_values = true",
+			expectMaskBehavior: true,
 		},
 		{
-			name:               "show_values false in toml",
-			tomlContent:        "show_values = false",
-			expectShowBehavior: false,
+			name:               "mask_values false in toml",
+			tomlContent:        "mask_values = false",
+			expectMaskBehavior: false,
 		},
 		{
-			name:               "show_values not set",
+			name:               "mask_values not set",
 			tomlContent:        "",
-			expectShowBehavior: false,
+			expectMaskBehavior: false,
 		},
 		{
 			name:               "toml with multiple settings",
-			tomlContent:        "shell = \"fish\"\nshow_values = true",
-			expectShowBehavior: true,
+			tomlContent:        "shell = \"fish\"\nmask_values = true",
+			expectMaskBehavior: true,
 		},
 	}
 
@@ -620,30 +620,32 @@ func TestGetCommandWithTomlShowValues(t *testing.T) {
 				t.Fatalf("Failed to write config file: %v", err)
 			}
 
-			// Load the config and check the show_values field
+			// Load the config and check the mask_values field
 			cfg, err := config.LoadTomlConfig()
 			if err != nil {
 				t.Fatalf("Failed to load TOML config: %v", err)
 			}
 
-			if cfg.ShowValues != tt.expectShowBehavior {
-				t.Errorf("Expected ShowValues=%v, got ShowValues=%v", tt.expectShowBehavior, cfg.ShowValues)
+			if cfg.MaskValues != tt.expectMaskBehavior {
+				t.Errorf("Expected MaskValues=%v, got MaskValues=%v", tt.expectMaskBehavior, cfg.MaskValues)
 			}
 
 			// Test the value source
-			vs := config.NewTomlValueSource("show")
+			vs := config.NewTomlValueSource("mask")
 			value, found := vs.Lookup()
 
-			if tt.expectShowBehavior {
+			if tt.expectMaskBehavior {
+				// When mask_values is true, Lookup should return "true"
 				if !found {
-					t.Error("Expected to find 'show' value in TOML config")
+					t.Error("Expected to find 'mask' value in TOML config")
 				}
 				if value != "true" {
 					t.Errorf("Expected value 'true', got %q", value)
 				}
 			} else {
+				// When mask_values is false or not set, Lookup should return not found
 				if found {
-					t.Error("Expected not to find 'show' value in TOML config")
+					t.Error("Expected not to find 'mask' value in TOML config")
 				}
 			}
 		})
