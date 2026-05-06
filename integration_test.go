@@ -54,11 +54,11 @@ func TestListCommandIntegration(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	// Create test secrets
-	testSecrets := map[string]string{
-		"/prod/billing-svc/vars/mg":     "secret1",
-		"/prod/billing-svc/vars/stripe": "secret2",
-		"/prod/auth-svc/api_key":        "secret3",
-		"/dev/test":                     "secret4",
+	testSecrets := storage.SecretStore{
+		"/prod/billing-svc/vars/mg":     {Value: "secret1"},
+		"/prod/billing-svc/vars/stripe": {Value: "secret2"},
+		"/prod/auth-svc/api_key":        {Value: "secret3"},
+		"/dev/test":                     {Value: "secret4"},
 	}
 
 	// Test filtering functionality
@@ -321,8 +321,8 @@ func TestErrorHandling(t *testing.T) {
 		if len(secrets) != 1 {
 			t.Errorf("Expected 1 secret, got %d", len(secrets))
 		}
-		if secrets["/test/key"] != "" {
-			t.Errorf("Expected empty value, got %q", secrets["/test/key"])
+		if secrets["/test/key"].Value != "" {
+			t.Errorf("Expected empty value, got %q", secrets["/test/key"].Value)
 		}
 	})
 
@@ -331,8 +331,8 @@ func TestErrorHandling(t *testing.T) {
 		if len(secrets) != 1 {
 			t.Errorf("Expected 1 secret, got %d", len(secrets))
 		}
-		if secrets["/test/key"] != "value=with=equals" {
-			t.Errorf("Expected 'value=with=equals', got %q", secrets["/test/key"])
+		if secrets["/test/key"].Value != "value=with=equals" {
+			t.Errorf("Expected 'value=with=equals', got %q", secrets["/test/key"].Value)
 		}
 	})
 }
@@ -340,9 +340,9 @@ func TestErrorHandling(t *testing.T) {
 // Benchmark tests for performance
 func BenchmarkGetFilteredKeys(b *testing.B) {
 	// Create a large secrets map
-	secrets := make(map[string]string)
+	secrets := make(storage.SecretStore)
 	for i := 0; i < 1000; i++ {
-		secrets[fmt.Sprintf("/prod/service%d/vars/key%d", i%10, i)] = fmt.Sprintf("value%d", i)
+		secrets[fmt.Sprintf("/prod/service%d/vars/key%d", i%10, i)] = storage.SecretEntry{Value: fmt.Sprintf("value%d", i)}
 	}
 
 	b.ResetTimer()

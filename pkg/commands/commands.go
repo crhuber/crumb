@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
@@ -213,8 +214,26 @@ func ListCommand(_ context.Context, cmd *cli.Command) error {
 		return nil
 	}
 
-	for _, key := range keys {
-		fmt.Println(key)
+	if cmd.Bool("long") {
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintf(w, "KEY\tUPDATED\tEXPIRES\n")
+		for _, key := range keys {
+			entry := secrets[key]
+			updated := entry.Updated
+			if updated == "" {
+				updated = "(unknown)"
+			}
+			expires := entry.Expires
+			if expires == "" {
+				expires = "(none)"
+			}
+			fmt.Fprintf(w, "%s\t%s\t%s\n", key, updated, expires)
+		}
+		w.Flush()
+	} else {
+		for _, key := range keys {
+			fmt.Println(key)
+		}
 	}
 
 	return nil
@@ -242,7 +261,31 @@ func SetCommand(_ context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	if _, exists := storage.SecretExists(secrets, keyPath); exists {
+	expires := cmd.String("expires")
+	if expires != "" {
+		parsed, parseErr := storage.ParseExpiryDate(expires)
+		if parseErr != nil {
+			return parseErr
+		}
+		expires = parsed
+	}
+
+	_, exists := storage.SecretExists(secrets, keyPath)
+
+	if expires != "" && cmd.Args().Len() == 1 && exists {
+		storage.SetSecretExpiry(secrets, keyPath, expires)
+		if err := storage.SaveSecrets(secrets, cfg.PublicKeyPath, b); err != nil {
+			return err
+		}
+		fmt.Printf("Successfully updated expiry for key: %s\n", keyPath)
+		return nil
+	}
+
+	if expires != "" && cmd.Args().Len() == 1 && !exists {
+		return fmt.Errorf("key '%s' does not exist, provide a value to create it", keyPath)
+	}
+
+	if exists {
 		fmt.Printf("Key '%s' already exists.\n", keyPath)
 		if !crypto.ConfirmOverwrite("key") {
 			fmt.Println("Operation cancelled.")
@@ -265,7 +308,11 @@ func SetCommand(_ context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("secret value cannot be empty")
 	}
 
-	storage.SetSecret(secrets, keyPath, value)
+	if expires != "" {
+		storage.SetSecretWithExpires(secrets, keyPath, value, expires)
+	} else {
+		storage.SetSecret(secrets, keyPath, value)
+	}
 
 	if err := storage.SaveSecrets(secrets, cfg.PublicKeyPath, b); err != nil {
 		return err
@@ -300,7 +347,7 @@ func GetCommand(_ context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	value, exists := storage.SecretExists(secrets, keyPath)
+	entry, exists := storage.SecretExists(secrets, keyPath)
 	if !exists {
 		fmt.Println("Key not found.")
 		return nil
@@ -310,10 +357,10 @@ func GetCommand(_ context.Context, cmd *cli.Command) error {
 		varName := storage.ExtractVarName(keyPath)
 		switch shell {
 		case "bash":
-			quotedValue := storage.ShellQuoteValue(value)
+			quotedValue := storage.ShellQuoteValue(entry.Value)
 			fmt.Printf("export %s=%s\n", varName, quotedValue)
 		case "fish":
-			quotedValue := storage.ShellQuoteValue(value)
+			quotedValue := storage.ShellQuoteValue(entry.Value)
 			fmt.Printf("set -x -g %s %s\n", varName, quotedValue)
 		default:
 			return fmt.Errorf("unsupported shell format: %s (supported: bash, fish)", shell)
@@ -324,8 +371,52 @@ func GetCommand(_ context.Context, cmd *cli.Command) error {
 	if maskValue {
 		fmt.Println("****")
 	} else {
-		fmt.Printf("%s\n", value)
+		fmt.Printf("%s\n", entry.Value)
 	}
+
+	return nil
+}
+
+// InfoCommand shows metadata for a secret without revealing the value.
+func InfoCommand(_ context.Context, cmd *cli.Command) error {
+	if cmd.Args().Len() != 1 {
+		return fmt.Errorf("usage: crumb info <key-path>")
+	}
+
+	keyPath := cmd.Args().Get(0)
+
+	if err := config.ValidateKeyPath(keyPath); err != nil {
+		return err
+	}
+
+	cfg, b, err := resolveBackend(cmd)
+	if err != nil {
+		return err
+	}
+
+	secrets, err := storage.LoadSecrets(cfg.PrivateKeyPath, b)
+	if err != nil {
+		return err
+	}
+
+	entry, exists := storage.SecretExists(secrets, keyPath)
+	if !exists {
+		fmt.Println("Key not found.")
+		return nil
+	}
+
+	updated := entry.Updated
+	if updated == "" {
+		updated = "(unknown)"
+	}
+	expires := entry.Expires
+	if expires == "" {
+		expires = "(none)"
+	}
+
+	fmt.Printf("Key:     %s\n", keyPath)
+	fmt.Printf("Updated: %s\n", updated)
+	fmt.Printf("Expires: %s\n", expires)
 
 	return nil
 }
@@ -522,7 +613,7 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 				}
 			}
 		} else {
-			if secretValue, exists := storage.SecretExists(secrets, pathFlag); exists {
+			if entry, exists := storage.SecretExists(secrets, pathFlag); exists {
 				comment := fmt.Sprintf("# Exported from %s", pathFlag)
 				switch shell {
 				case "bash":
@@ -533,7 +624,7 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 
 				keyName := storage.ExtractVarName(pathFlag)
 				if keyName != "" {
-					envVars[keyName] = secretValue
+					envVars[keyName] = entry.Value
 				}
 			}
 		}
@@ -578,8 +669,8 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 			sanitizedEnvVarName := strings.ToUpper(strings.ReplaceAll(envVarName, "-", "_"))
 
 			if strings.HasPrefix(envVarValue, "/") {
-				if secretValue, exists := storage.SecretExists(secrets, envVarValue); exists {
-					envVars[sanitizedEnvVarName] = secretValue
+				if entry, exists := storage.SecretExists(secrets, envVarValue); exists {
+					envVars[sanitizedEnvVarName] = entry.Value
 				}
 			} else {
 				envVars[sanitizedEnvVarName] = envVarValue

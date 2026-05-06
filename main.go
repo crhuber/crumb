@@ -65,12 +65,25 @@ func main() {
 				Usage:     "List stored secret keys",
 				Action:    commands.ListCommand,
 				ArgsUsage: "[path]",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:    "long",
+						Aliases: []string{"l"},
+						Usage:   "Show metadata columns (updated, expires)",
+					},
+				},
 			},
 			{
 				Name:      "set",
 				Usage:     "Add or update a secret key-value pair",
 				Action:    commands.SetCommand,
 				ArgsUsage: "<key-path> [value]",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "expires",
+						Usage: "Expiry date (e.g., 2026-12-31, 31.12.2026, 31/12/2026)",
+					},
+				},
 			},
 			{
 				Name:      "get",
@@ -99,6 +112,17 @@ func main() {
 				Name:   "init",
 				Usage:  "Create a YAML configuration file in current directory",
 				Action: commands.InitCommand,
+			},
+			{
+				Name:      "info",
+				Usage:     "Show metadata for a secret (without revealing the value)",
+				Action:    commands.InfoCommand,
+				ArgsUsage: "<key-path>",
+			},
+			{
+				Name:   "migrate",
+				Usage:  "Migrate secrets from legacy key=value format to TOML format",
+				Action: commands.MigrateCommand,
 			},
 			{
 				Name:      "delete",

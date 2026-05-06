@@ -128,13 +128,13 @@ func TestValidateKeyPath(t *testing.T) {
 
 // Test filtered keys functionality
 func TestGetFilteredKeys(t *testing.T) {
-	secrets := map[string]string{
-		"/prod/billing-svc/vars/mg":     "secret1",
-		"/prod/billing-svc/vars/stripe": "secret2",
-		"/prod/billing-svc/configs/app": "secret3",
-		"/prod/auth-svc/api_key":        "secret4",
-		"/dev/billing-svc/vars/mg":      "secret5",
-		"/staging/test":                 "secret6",
+	secrets := storage.SecretStore{
+		"/prod/billing-svc/vars/mg":     {Value: "secret1"},
+		"/prod/billing-svc/vars/stripe": {Value: "secret2"},
+		"/prod/billing-svc/configs/app": {Value: "secret3"},
+		"/prod/auth-svc/api_key":        {Value: "secret4"},
+		"/dev/billing-svc/vars/mg":      {Value: "secret5"},
+		"/staging/test":                 {Value: "secret6"},
 	}
 
 	tests := []struct {
@@ -460,10 +460,10 @@ func TestSecretParsing(t *testing.T) {
 	}
 
 	for key, expectedValue := range expected {
-		if actualValue, exists := result[key]; !exists {
+		if entry, exists := result[key]; !exists {
 			t.Errorf("Expected key %q not found", key)
-		} else if actualValue != expectedValue {
-			t.Errorf("Key %q: expected value %q, got %q", key, expectedValue, actualValue)
+		} else if entry.Value != expectedValue {
+			t.Errorf("Key %q: expected value %q, got %q", key, expectedValue, entry.Value)
 		}
 	}
 }

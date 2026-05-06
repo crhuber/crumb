@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/urfave/cli/v3"
@@ -120,7 +119,7 @@ func StorageClearCommand(_ context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-// StorageShowCommand decrypts and displays all secrets in plain text
+// StorageShowCommand decrypts and displays all secrets in TOML format
 func StorageShowCommand(_ context.Context, cmd *cli.Command) error {
 	cfg, b, err := resolveBackend(cmd)
 	if err != nil {
@@ -149,15 +148,8 @@ func StorageShowCommand(_ context.Context, cmd *cli.Command) error {
 		return nil
 	}
 
-	var keys []string
-	for key := range secrets {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	for _, key := range keys {
-		fmt.Printf("%s=%s\n", key, secrets[key])
-	}
+	content := storage.SerializeSecretsForDisplay(secrets)
+	fmt.Print(content)
 
 	return nil
 }
@@ -182,16 +174,10 @@ func StorageEditCommand(_ context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	// Build sorted key=value content
-	var lines []string
-	for key, value := range secrets {
-		lines = append(lines, fmt.Sprintf("%s=%s", key, value))
-	}
-	sort.Strings(lines)
-	content := strings.Join(lines, "\n") + "\n"
+	content := storage.SerializeSecretsForDisplay(secrets)
 
-	// Write to temp file
-	tmpFile, err := os.CreateTemp("", "crumb-edit-*.txt")
+	// Write to temp file with .toml extension for syntax highlighting
+	tmpFile, err := os.CreateTemp("", "crumb-edit-*.toml")
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
@@ -225,7 +211,7 @@ func StorageEditCommand(_ context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to read edited file: %w", err)
 	}
 
-	// Parse edited secrets
+	// Parse edited secrets (supports both TOML and legacy formats)
 	newSecrets := storage.ParseSecrets(string(editedData))
 
 	// Save re-encrypted secrets
