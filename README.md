@@ -12,6 +12,7 @@
 - [SecretSpec](https://devenv.sh/blog/2025/07/21/announcing-secretspec-declarative-secrets-management/)
 - [Fnox](https://github.com/jdx/fnox)
 - [Scrt](https://scrt.run/)
+- [Chezmoi](https://www.chezmoi.io/user-guide/password-managers/)
 
 but, designed for the non-enterprise developer without access to a cloud Secrets Manager, raft storage, etc. Crumb was born out of the need to be able to load secrets without leaving ecrets unencrypted on disk.
 
@@ -38,6 +39,9 @@ crumb get /myapp/api_key
 
 # 5. Export secrets as environment variables
 eval "$(crumb export --path /myapp)"
+
+# 6. List keys
+crumb ls
 ```
 
 ## Features
@@ -103,7 +107,7 @@ $ crumb --profile work setup
 The `set` command adds or updates a secret key-value pair. The value is entered securely on a new line and is not echoed to the terminal or stored in shell history.
 
 ```bash
-crumb set <key-path>
+crumb set <key-path> [value] [--expires <RFC3339>]
 ```
 
 
@@ -114,6 +118,9 @@ crumb set <key-path>
 $ crumb set /myapp/api_key
 Enter secret value: [secret not shown]
 Successfully set key: /myapp/api_key
+
+# Set with an expiry date
+$ crumb set /myapp/api_key sk_live_abc123 --expires 2026-12-31
 
 # Update an existing secret (with confirmation)
 $ crumb set /myapp/api_key
@@ -129,7 +136,7 @@ Successfully set key: /myapp/api_key
 The `ls` command lists all stored secret keys, optionally filtered by path.
 
 ```bash
-crumb ls [path]
+crumb ls [path] [--long]
 ```
 
 
@@ -144,6 +151,12 @@ $ crumb ls
 $ crumb ls /myapp
 /myapp/api_key
 /myapp/secret
+
+# Show metadata (updated, expires) in table format
+$ crumb ls -l
+KEY                    UPDATED               EXPIRES
+/myapp/api_key         2026-05-01T10:30:00Z  (none)
+/myapp/secret          2026-05-01T10:30:00Z  2026-12-31T00:00:00Z
 ```
 
 
@@ -298,6 +311,39 @@ crumb move <old-key-path> <new-key-path>
 crumb mv <old-key-path> <new-key-path>
 ```
 
+
+### Info Command
+
+The `info` command shows metadata for a secret without revealing its value.
+
+```bash
+crumb info <key-path>
+```
+
+#### Example Usage
+
+```bash
+$ crumb info /myapp/api_key
+Key:     /myapp/api_key
+Updated: 2026-05-01T10:30:00Z
+Expires: (none)
+```
+
+### Migrate Command
+
+The `migrate` command converts secrets from the legacy `key=value` format to the new TOML-based storage format. A backup of the encrypted file is created before migration.
+
+```bash
+crumb migrate [--profile <profile-name>]
+```
+
+#### Example Usage
+
+```bash
+$ crumb migrate
+Backed up to /Users/username/.config/crumb/secrets.bak
+Migrated 12 secrets to TOML format.
+```
 
 ### Import Command
 

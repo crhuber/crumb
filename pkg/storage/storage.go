@@ -5,37 +5,47 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"filippo.io/age"
+	"github.com/BurntSushi/toml"
 
 	"crumb/pkg/backend"
 	"crumb/pkg/crypto"
 )
 
+// SecretEntry holds a secret value and its metadata.
+type SecretEntry struct {
+	Value   string `toml:"value"`
+	Updated string `toml:"updated"`
+	Expires string `toml:"expires"`
+}
+
+// SecretStore is the top-level structure: map of key-path to entry.
+type SecretStore map[string]SecretEntry
+
 // LoadSecrets loads and decrypts secrets from the given backend.
-func LoadSecrets(privateKeyPath string, b backend.Backend) (map[string]string, error) {
+func LoadSecrets(privateKeyPath string, b backend.Backend) (SecretStore, error) {
 	exists, err := b.Exists()
 	if err != nil {
 		return nil, fmt.Errorf("failed to check storage: %w", err)
 	}
 	if !exists {
-		return make(map[string]string), nil
+		return make(SecretStore), nil
 	}
 
-	// Parse private key identity
 	identity, err := crypto.ParseSSHPrivateKey(privateKeyPath)
 	if err != nil {
 		return nil, err
 	}
 
-	// Read and decrypt secrets
 	encryptedData, err := b.Read()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read secrets: %w", err)
 	}
 
 	if len(encryptedData) == 0 {
-		return make(map[string]string), nil
+		return make(SecretStore), nil
 	}
 
 	decryptedData, err := crypto.DecryptData(encryptedData, identity)
@@ -43,48 +53,45 @@ func LoadSecrets(privateKeyPath string, b backend.Backend) (map[string]string, e
 		return nil, fmt.Errorf("failed to decrypt secrets: %w", err)
 	}
 
-	// Parse key-value pairs
-	secrets := parseSecrets(decryptedData)
-	return secrets, nil
+	content := strings.TrimSpace(decryptedData)
+	if content == "" {
+		return make(SecretStore), nil
+	}
+
+	format := detectFormat(content)
+	if format == "toml" {
+		return parseSecretsToml(content)
+	}
+	return parseLegacySecrets(content), nil
 }
 
 // SaveSecrets encrypts and saves secrets to the given backend.
-func SaveSecrets(secrets map[string]string, publicKeyPath string, b backend.Backend) error {
-	// Parse public key as recipient
+func SaveSecrets(secrets SecretStore, publicKeyPath string, b backend.Backend) error {
 	recipient, err := crypto.ParseSSHPublicKey(publicKeyPath)
 	if err != nil {
 		return err
 	}
 
-	// Convert secrets map to string format
-	var lines []string
-	for key, value := range secrets {
-		lines = append(lines, fmt.Sprintf("%s=%s", key, value))
+	content, err := serializeSecrets(secrets)
+	if err != nil {
+		return fmt.Errorf("failed to serialize secrets: %w", err)
 	}
 
-	// Sort lines for consistent output
-	sort.Strings(lines)
-	content := strings.Join(lines, "\n")
-
-	// Encrypt the content
 	encryptedData, err := crypto.EncryptData(content, []age.Recipient{recipient})
 	if err != nil {
 		return fmt.Errorf("failed to encrypt secrets: %w", err)
 	}
 
-	// Write encrypted data
 	return b.Write(encryptedData)
 }
 
 // CreateEmptyStorage creates an empty encrypted storage via the given backend.
 func CreateEmptyStorage(publicKeyPath string, b backend.Backend) error {
-	// Parse public key as recipient
 	recipient, err := crypto.ParseSSHPublicKey(publicKeyPath)
 	if err != nil {
 		return err
 	}
 
-	// Encrypt empty content
 	encryptedData, err := crypto.EncryptData("", []age.Recipient{recipient})
 	if err != nil {
 		return fmt.Errorf("failed to encrypt empty secrets: %w", err)
@@ -93,21 +100,18 @@ func CreateEmptyStorage(publicKeyPath string, b backend.Backend) error {
 	return b.Write(encryptedData)
 }
 
-// GetFilteredKeys returns a sorted list of keys that match the given path filter
-func GetFilteredKeys(secrets map[string]string, pathFilter string) []string {
+// GetFilteredKeys returns a sorted list of keys that match the given path filter.
+func GetFilteredKeys(secrets SecretStore, pathFilter string) []string {
 	var keys []string
 
-	// Normalize path filter (remove trailing slash if present)
 	if pathFilter != "" && pathFilter != "/" {
 		pathFilter = strings.TrimSuffix(pathFilter, "/")
 	}
 
-	// Extract keys from secrets map
 	for key := range secrets {
 		keys = append(keys, key)
 	}
 
-	// Filter keys if path filter is provided
 	if pathFilter != "" {
 		var filteredKeys []string
 		for _, key := range keys {
@@ -118,39 +122,82 @@ func GetFilteredKeys(secrets map[string]string, pathFilter string) []string {
 		keys = filteredKeys
 	}
 
-	// Sort keys alphabetically
 	sort.Strings(keys)
-
 	return keys
 }
 
-// ExtractVarName converts a key path to a valid environment variable name
+// ExtractVarName converts a key path to a valid environment variable name.
 func ExtractVarName(keyPath string) string {
-	// Remove leading slash
 	trimmed := strings.TrimPrefix(keyPath, "/")
-
-	// Get the last segment of the path (the actual secret name)
 	pathSegments := strings.Split(trimmed, "/")
 	if len(pathSegments) > 0 {
 		varName := pathSegments[len(pathSegments)-1]
-		// Replace hyphens with underscores
 		varName = strings.ReplaceAll(varName, "-", "_")
-		// Convert to uppercase
 		varName = strings.ToUpper(varName)
 		return varName
 	}
-
 	return ""
 }
 
-// ParseSecrets parses the decrypted secrets content into a map (public for testing)
-func ParseSecrets(content string) map[string]string {
-	return parseSecrets(content)
+// ParseSecrets parses decrypted content into a SecretStore.
+// Supports both TOML and legacy key=value formats.
+func ParseSecrets(content string) SecretStore {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return make(SecretStore)
+	}
+	format := detectFormat(content)
+	if format == "toml" {
+		store, err := parseSecretsToml(content)
+		if err != nil {
+			return make(SecretStore)
+		}
+		return store
+	}
+	return parseLegacySecrets(content)
 }
 
-// parseSecrets parses the decrypted secrets content into a map
-func parseSecrets(content string) map[string]string {
-	secrets := make(map[string]string)
+// DetectFormat returns "toml" or "legacy" based on content inspection.
+func DetectFormat(content string) string {
+	return detectFormat(content)
+}
+
+func detectFormat(content string) string {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return "toml"
+	}
+	var store SecretStore
+	if _, err := toml.Decode(content, &store); err == nil && len(store) > 0 {
+		return "toml"
+	}
+	return "legacy"
+}
+
+// parseSecretsToml parses TOML-formatted secrets content.
+// TOML keys are stored without leading slash; this restores them.
+func parseSecretsToml(content string) (SecretStore, error) {
+	var raw SecretStore
+	if _, err := toml.Decode(content, &raw); err != nil {
+		return nil, fmt.Errorf("failed to parse TOML secrets: %w", err)
+	}
+	store := make(SecretStore, len(raw))
+	for key, entry := range raw {
+		if !strings.HasPrefix(key, "/") {
+			key = "/" + key
+		}
+		store[key] = entry
+	}
+	return store, nil
+}
+
+// ParseLegacySecrets parses the old key=value format into a SecretStore.
+func ParseLegacySecrets(content string) SecretStore {
+	return parseLegacySecrets(content)
+}
+
+func parseLegacySecrets(content string) SecretStore {
+	secrets := make(SecretStore)
 	lines := strings.Split(strings.TrimSpace(content), "\n")
 
 	for _, line := range lines {
@@ -166,38 +213,111 @@ func parseSecrets(content string) map[string]string {
 
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
-		secrets[key] = value
+		secrets[key] = SecretEntry{Value: value}
 	}
 
 	return secrets
 }
 
-// matchesPathFilter checks if a key matches the given path filter
+// serializeSecrets converts a SecretStore to a TOML string.
+func serializeSecrets(store SecretStore) (string, error) {
+	if len(store) == 0 {
+		return "", nil
+	}
+
+	var keys []string
+	for key := range store {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	var buf strings.Builder
+	for i, key := range keys {
+		entry := store[key]
+		if i > 0 {
+			buf.WriteString("\n")
+		}
+
+		tomlKey := strings.TrimPrefix(key, "/")
+		fmt.Fprintf(&buf, "[%q]\n", tomlKey)
+
+		if strings.Contains(entry.Value, "\n") {
+			fmt.Fprintf(&buf, "value = \"\"\"\n%s\"\"\"\n", entry.Value)
+		} else {
+			fmt.Fprintf(&buf, "value = %q\n", entry.Value)
+		}
+
+		fmt.Fprintf(&buf, "updated = %q\n", entry.Updated)
+		fmt.Fprintf(&buf, "expires = %q\n", entry.Expires)
+	}
+
+	return buf.String(), nil
+}
+
+// SerializeSecretsForDisplay returns a human-readable TOML representation of the store.
+func SerializeSecretsForDisplay(store SecretStore) string {
+	content, err := serializeSecrets(store)
+	if err != nil {
+		return ""
+	}
+	return content
+}
+
 func matchesPathFilter(key, pathFilter string) bool {
-	// Handle root path filter
 	if pathFilter == "/" {
 		return true
 	}
-
-	// Check if key starts with the path filter
-	// This provides partial matching as specified in the PRD
-	// e.g., "/any" matches "/any/path/mykey"
 	return strings.HasPrefix(key, pathFilter)
 }
 
-// SecretExists checks if a secret with the given key exists
-func SecretExists(secrets map[string]string, key string) (string, bool) {
-	value, exists := secrets[key]
-	return value, exists
+// SecretExists checks if a secret with the given key exists.
+func SecretExists(secrets SecretStore, key string) (SecretEntry, bool) {
+	entry, exists := secrets[key]
+	return entry, exists
 }
 
-// SetSecret sets a secret in the secrets map
-func SetSecret(secrets map[string]string, key, value string) {
-	secrets[key] = value
+// SetSecret sets a secret in the store with the current timestamp.
+func SetSecret(secrets SecretStore, key, value string) {
+	secrets[key] = SecretEntry{
+		Value:   value,
+		Updated: time.Now().UTC().Format(time.RFC3339),
+	}
 }
 
-// DeleteSecret removes a secret from the secrets map
-func DeleteSecret(secrets map[string]string, key string) bool {
+// SetSecretWithExpires sets a secret with an explicit expiry timestamp.
+func SetSecretWithExpires(secrets SecretStore, key, value, expires string) {
+	secrets[key] = SecretEntry{
+		Value:   value,
+		Updated: time.Now().UTC().Format(time.RFC3339),
+		Expires: expires,
+	}
+}
+
+// ParseExpiryDate parses a human-friendly date string into RFC3339 format.
+func ParseExpiryDate(input string) (string, error) {
+	formats := []string{
+		time.RFC3339,
+		"2006-01-02",
+		"02.01.2006",
+		"02/01/2006",
+	}
+	for _, layout := range formats {
+		if t, err := time.Parse(layout, input); err == nil {
+			return t.UTC().Format(time.RFC3339), nil
+		}
+	}
+	return "", fmt.Errorf("invalid date format %q, accepted: YYYY-MM-DD, DD.MM.YYYY, DD/MM/YYYY", input)
+}
+
+// SetSecretExpiry updates only the expiry on an existing secret.
+func SetSecretExpiry(secrets SecretStore, key, expires string) {
+	entry := secrets[key]
+	entry.Expires = expires
+	secrets[key] = entry
+}
+
+// DeleteSecret removes a secret from the store.
+func DeleteSecret(secrets SecretStore, key string) bool {
 	if _, exists := secrets[key]; exists {
 		delete(secrets, key)
 		return true
@@ -205,48 +325,45 @@ func DeleteSecret(secrets map[string]string, key string) bool {
 	return false
 }
 
-// MoveSecret moves a secret from one key to another
-func MoveSecret(secrets map[string]string, oldKey, newKey string) error {
-	value, exists := secrets[oldKey]
+// MoveSecret moves a secret from one key to another, preserving metadata.
+func MoveSecret(secrets SecretStore, oldKey, newKey string) error {
+	entry, exists := secrets[oldKey]
 	if !exists {
 		return fmt.Errorf("old key not found: %s", oldKey)
 	}
 
-	// Check if new key already exists
 	if _, exists := secrets[newKey]; exists {
 		if !crypto.ConfirmOverwrite("key") {
 			return fmt.Errorf("operation cancelled")
 		}
 	}
 
-	// Move the key-value pair
-	secrets[newKey] = value
+	entry.Updated = time.Now().UTC().Format(time.RFC3339)
+	secrets[newKey] = entry
 	delete(secrets, oldKey)
 
 	return nil
 }
 
-// GetSecretsForPath returns all secrets that match a given path prefix
-func GetSecretsForPath(secrets map[string]string, pathPrefix string) map[string]string {
+// GetSecretsForPath returns values for all secrets matching a path prefix.
+func GetSecretsForPath(secrets SecretStore, pathPrefix string) map[string]string {
 	result := make(map[string]string)
 	pathPrefix = strings.TrimSuffix(pathPrefix, "/")
 
-	for secretPath, secretValue := range secrets {
+	for secretPath, entry := range secrets {
 		if strings.HasPrefix(secretPath, pathPrefix) {
-			result[secretPath] = secretValue
+			result[secretPath] = entry.Value
 		}
 	}
 
 	return result
 }
 
-// ConvertPathToEnvVar converts a secret path to an environment variable name for direct export
+// ConvertPathToEnvVar converts a secret path to an environment variable name for direct export.
 func ConvertPathToEnvVar(secretPath, pathPrefix string) string {
-	// Extract just the final segment (actual secret name) from the path
 	remainingPath := strings.TrimPrefix(secretPath, pathPrefix)
 	remainingPath = strings.TrimPrefix(remainingPath, "/")
 
-	// Get the last segment of the path (the actual secret name)
 	pathSegments := strings.Split(remainingPath, "/")
 	if len(pathSegments) > 0 {
 		keyName := pathSegments[len(pathSegments)-1]
@@ -257,7 +374,7 @@ func ConvertPathToEnvVar(secretPath, pathPrefix string) string {
 	return ""
 }
 
-// ParseEnvFile parses a .env file and returns a map of key-value pairs
+// ParseEnvFile parses a .env file and returns a map of key-value pairs.
 func ParseEnvFile(filePath string) (map[string]string, error) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
@@ -267,7 +384,7 @@ func ParseEnvFile(filePath string) (map[string]string, error) {
 	return parseEnvContent(string(content)), nil
 }
 
-// parseEnvContent parses .env file content into a map
+// parseEnvContent parses .env file content into a map.
 func parseEnvContent(content string) map[string]string {
 	envVars := make(map[string]string)
 	lines := strings.Split(content, "\n")
@@ -275,12 +392,10 @@ func parseEnvContent(content string) map[string]string {
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 
-		// Skip empty lines and comments
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
 
-		// Find the first = sign
 		eqIndex := strings.Index(line, "=")
 		if eqIndex == -1 {
 			continue
@@ -289,7 +404,6 @@ func parseEnvContent(content string) map[string]string {
 		key := strings.TrimSpace(line[:eqIndex])
 		value := strings.TrimSpace(line[eqIndex+1:])
 
-		// Remove quotes from value if present
 		if len(value) >= 2 {
 			if (strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"")) ||
 				(strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'")) {
@@ -305,12 +419,10 @@ func parseEnvContent(content string) map[string]string {
 	return envVars
 }
 
-// ShellQuoteValue quotes a value for safe shell consumption if needed
+// ShellQuoteValue quotes a value for safe shell consumption if needed.
 func ShellQuoteValue(value string) string {
-	// Check if value needs quoting (contains spaces, special chars, etc.)
 	needsQuoting := false
 
-	// Characters that require quoting in shell contexts
 	for _, char := range value {
 		if char == ' ' || char == '\t' || char == '|' || char == '&' ||
 			char == ';' || char == '(' || char == ')' || char == '<' ||
@@ -323,13 +435,11 @@ func ShellQuoteValue(value string) string {
 		}
 	}
 
-	// Also quote if value is empty
 	if value == "" {
 		needsQuoting = true
 	}
 
 	if needsQuoting {
-		// Use double quotes and escape any existing double quotes
 		escaped := strings.ReplaceAll(value, "\"", "\\\"")
 		return "\"" + escaped + "\""
 	}
