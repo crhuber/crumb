@@ -106,6 +106,11 @@ func main() {
 						Value:   "bash",
 						Sources: cli.NewValueSourceChain(config.NewTomlValueSource("shell")),
 					},
+					&cli.BoolFlag{
+						Name:    "interactive",
+						Aliases: []string{"i"},
+						Usage:   "Pick a secret path interactively",
+					},
 				},
 			},
 			{
@@ -118,6 +123,13 @@ func main() {
 				Usage:     "Show metadata for a secret (without revealing the value)",
 				Action:    commands.InfoCommand,
 				ArgsUsage: "<key-path>",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:    "interactive",
+						Aliases: []string{"i"},
+						Usage:   "Pick a secret path interactively",
+					},
+				},
 			},
 			{
 				Name:   "migrate",

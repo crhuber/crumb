@@ -324,11 +324,19 @@ func SetCommand(_ context.Context, cmd *cli.Command) error {
 
 // GetCommand handles the get command
 func GetCommand(_ context.Context, cmd *cli.Command) error {
-	if cmd.Args().Len() != 1 {
-		return fmt.Errorf("usage: crumb get <key-path>")
+	var keyPath string
+	if cmd.Bool("interactive") {
+		picked, err := pickSecretPath(cmd)
+		if err != nil {
+			return err
+		}
+		keyPath = picked
+	} else {
+		if cmd.Args().Len() != 1 {
+			return fmt.Errorf("usage: crumb get <key-path>")
+		}
+		keyPath = cmd.Args().Get(0)
 	}
-
-	keyPath := cmd.Args().Get(0)
 	maskValue := cmd.Bool("mask")
 	exportFormat := cmd.Bool("export")
 	shell := cmd.String("shell")
@@ -379,11 +387,19 @@ func GetCommand(_ context.Context, cmd *cli.Command) error {
 
 // InfoCommand shows metadata for a secret without revealing the value.
 func InfoCommand(_ context.Context, cmd *cli.Command) error {
-	if cmd.Args().Len() != 1 {
-		return fmt.Errorf("usage: crumb info <key-path>")
+	var keyPath string
+	if cmd.Bool("interactive") {
+		picked, err := pickSecretPath(cmd)
+		if err != nil {
+			return err
+		}
+		keyPath = picked
+	} else {
+		if cmd.Args().Len() != 1 {
+			return fmt.Errorf("usage: crumb info <key-path>")
+		}
+		keyPath = cmd.Args().Get(0)
 	}
-
-	keyPath := cmd.Args().Get(0)
 
 	if err := config.ValidateKeyPath(keyPath); err != nil {
 		return err
