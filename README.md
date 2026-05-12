@@ -51,6 +51,7 @@ crumb ls
 - **Bulk Export**: Exports multiple secrets from an entire path like `/myapp/dev/`
 - **Multi-Profile Support**: Manage separate secret stores for work, personal, or different projects
 - **.env Import**: Import multiple secrets from `.env` files
+- **Interactive Selection**: Fuzzy finder for picking secrets with `-i` flag on `get` and `info`
 - **Shell Integration**: Automatic secret loading with shell hooks (bash, zsh, fish)
 
 ## Installation
@@ -165,13 +166,16 @@ KEY                    UPDATED               EXPIRES
 The `get` command retrieves a secret by its key path.
 
 ```bash
-crumb get <key-path> [--mask] [--export] [--shell=bash|fish]
+crumb get <key-path> [--mask] [--export] [--shell=bash|fish] [-i]
 ```
 
 
 #### Example Usage
 
 ```bash
+# Interactively pick a secret with fuzzy finder
+$ crumb get -i
+
 # Get a secret
 $ crumb get /myapp/api_key
 secret123
@@ -317,12 +321,15 @@ crumb mv <old-key-path> <new-key-path>
 The `info` command shows metadata for a secret without revealing its value.
 
 ```bash
-crumb info <key-path>
+crumb info <key-path> [-i]
 ```
 
 #### Example Usage
 
 ```bash
+# Interactively pick a secret to inspect
+$ crumb info -i
+
 $ crumb info /myapp/api_key
 Key:     /myapp/api_key
 Updated: 2026-05-01T10:30:00Z
