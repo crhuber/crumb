@@ -668,10 +668,19 @@ func LoadCommand(_ context.Context, cmd *cli.Command) error {
 
 // ExportCommand handles exporting secrets directly from a given path
 func ExportCommand(_ context.Context, cmd *cli.Command) error {
-	if cmd.Args().Len() != 1 {
-		return fmt.Errorf("usage: crumb export <path>")
+	var path string
+	if cmd.Bool("interactive") {
+		picked, err := pickSecretPath(cmd)
+		if err != nil {
+			return err
+		}
+		path = picked
+	} else {
+		if cmd.Args().Len() != 1 {
+			return fmt.Errorf("usage: crumb export <path>")
+		}
+		path = cmd.Args().Get(0)
 	}
-	path := cmd.Args().Get(0)
 
 	shell := cmd.String("shell")
 	if shell == "" {

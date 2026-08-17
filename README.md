@@ -51,7 +51,7 @@ crumb ls
 - **Bulk Export**: Exports multiple secrets from an entire path like `/myapp/dev/`
 - **Multi-Profile Support**: Manage separate secret stores for work, personal, or different projects
 - **.env Import**: Import multiple secrets from `.env` files
-- **Interactive Selection**: Fuzzy finder for picking secrets with `-i` flag on `get` and `info`
+- **Interactive Selection**: Fuzzy finder for picking secrets with `-i` flag on `get`, `info`, and `export`
 - **Shell Integration**: Automatic secret loading with shell hooks (bash, zsh, fish)
 
 ## Installation
@@ -565,7 +565,7 @@ environments:
 The `export` command exports secrets from a specific path directly, without requiring a `.crumb.yaml` file.
 
 ```bash
-crumb export <secret-path> [--shell=bash|fish] [--profile <profile-name>]
+crumb export <secret-path> [--shell=bash|fish] [--profile <profile-name>] [-i]
 ```
 
 #### Example Usage
@@ -585,6 +585,9 @@ $ crumb export /myapp/dev/ --profile work
 
 # Source directly into shell
 $ eval "$(crumb export /myapp/dev/)"
+
+# Pick a secret path interactively with a fuzzy finder
+$ crumb export -i
 ```
 
 **Path to Variable Name Conversion**:
