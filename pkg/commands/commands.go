@@ -586,14 +586,12 @@ func computeEnvDiff(newVars map[string]string) string {
 	return strings.Join(parts, " ")
 }
 
-// ExportCommand handles the export command
-func ExportCommand(_ context.Context, cmd *cli.Command) error {
+// LoadCommand handles loading and exporting secrets from a .crumb.yaml project configuration
+func LoadCommand(_ context.Context, cmd *cli.Command) error {
 	shell := cmd.String("shell")
 	if shell == "" {
 		shell = "bash"
 	}
-
-	pathFlag := cmd.String("path")
 
 	cfg, b, err := resolveBackend(cmd)
 	if err != nil {
@@ -607,103 +605,133 @@ func ExportCommand(_ context.Context, cmd *cli.Command) error {
 
 	envVars := make(map[string]string)
 
-	if pathFlag != "" {
-		isPathPrefix := strings.HasSuffix(pathFlag, "/")
+	configFile := cmd.String("file")
+	environmentName := cmd.String("env")
 
-		if isPathPrefix {
-			pathPrefix := strings.TrimSuffix(pathFlag, "/")
+	crumbConfig, err := config.LoadCrumbConfig(configFile)
+	if err != nil {
+		return err
+	}
 
-			comment := fmt.Sprintf("# Exported from %s", pathPrefix)
-			switch shell {
-			case "bash":
-				fmt.Println(comment)
-			case "fish":
-				fmt.Println(comment)
-			}
+	envConfig, exists := crumbConfig.Environments[environmentName]
+	if !exists {
+		return fmt.Errorf("environment '%s' not found in %s", environmentName, configFile)
+	}
 
-			pathSecrets := storage.GetSecretsForPath(secrets, pathPrefix)
-			for secretPath, secretValue := range pathSecrets {
-				keyName := storage.ConvertPathToEnvVar(secretPath, pathPrefix)
-				if keyName != "" {
-					envVars[keyName] = secretValue
-				}
-			}
-		} else {
-			if entry, exists := storage.SecretExists(secrets, pathFlag); exists {
-				comment := fmt.Sprintf("# Exported from %s", pathFlag)
-				switch shell {
-				case "bash":
-					fmt.Println(comment)
-				case "fish":
-					fmt.Println(comment)
-				}
-
-				keyName := storage.ExtractVarName(pathFlag)
-				if keyName != "" {
-					envVars[keyName] = entry.Value
-				}
-			}
-		}
-	} else {
-		configFile := cmd.String("file")
-		environmentName := cmd.String("env")
-
-		crumbConfig, err := config.LoadCrumbConfig(configFile)
-		if err != nil {
-			return err
+	if envConfig.Path != "" {
+		comment := fmt.Sprintf("# Exported from %s (environment: %s)", envConfig.Path, environmentName)
+		switch shell {
+		case "bash":
+			fmt.Println(comment)
+		case "fish":
+			fmt.Println(comment)
 		}
 
-		envConfig, exists := crumbConfig.Environments[environmentName]
-		if !exists {
-			return fmt.Errorf("environment '%s' not found in %s", environmentName, configFile)
-		}
+		pathPrefix := strings.TrimSuffix(envConfig.Path, "/")
+		pathSecrets := storage.GetSecretsForPath(secrets, pathPrefix)
+		for secretPath, secretValue := range pathSecrets {
+			keyName := strings.TrimPrefix(secretPath, pathPrefix)
+			keyName = strings.TrimPrefix(keyName, "/")
+			keyName = strings.ToUpper(strings.ReplaceAll(keyName, "/", "_"))
+			keyName = strings.ReplaceAll(keyName, "-", "_")
 
-		if envConfig.Path != "" {
-			comment := fmt.Sprintf("# Exported from %s (environment: %s)", envConfig.Path, environmentName)
-			switch shell {
-			case "bash":
-				fmt.Println(comment)
-			case "fish":
-				fmt.Println(comment)
-			}
-
-			pathPrefix := strings.TrimSuffix(envConfig.Path, "/")
-			pathSecrets := storage.GetSecretsForPath(secrets, pathPrefix)
-			for secretPath, secretValue := range pathSecrets {
-				keyName := strings.TrimPrefix(secretPath, pathPrefix)
-				keyName = strings.TrimPrefix(keyName, "/")
-				keyName = strings.ToUpper(strings.ReplaceAll(keyName, "/", "_"))
-				keyName = strings.ReplaceAll(keyName, "-", "_")
-
-				if keyName != "" {
-					envVars[keyName] = secretValue
-				}
-			}
-		}
-
-		for envVarName, envVarValue := range envConfig.Env {
-			sanitizedEnvVarName := strings.ToUpper(strings.ReplaceAll(envVarName, "-", "_"))
-
-			if strings.HasPrefix(envVarValue, "/") {
-				if entry, exists := storage.SecretExists(secrets, envVarValue); exists {
-					envVars[sanitizedEnvVarName] = entry.Value
-				}
-			} else {
-				envVars[sanitizedEnvVarName] = envVarValue
-			}
-		}
-
-		for originalKey, newKey := range envConfig.Remap {
-			sanitizedOriginalKey := strings.ToUpper(strings.ReplaceAll(originalKey, "-", "_"))
-			sanitizedNewKey := strings.ToUpper(strings.ReplaceAll(newKey, "-", "_"))
-
-			if value, exists := envVars[sanitizedOriginalKey]; exists {
-				envVars[sanitizedNewKey] = value
-				delete(envVars, sanitizedOriginalKey)
+			if keyName != "" {
+				envVars[keyName] = secretValue
 			}
 		}
 	}
 
+	for envVarName, envVarValue := range envConfig.Env {
+		sanitizedEnvVarName := strings.ToUpper(strings.ReplaceAll(envVarName, "-", "_"))
+
+		if strings.HasPrefix(envVarValue, "/") {
+			if entry, exists := storage.SecretExists(secrets, envVarValue); exists {
+				envVars[sanitizedEnvVarName] = entry.Value
+			}
+		} else {
+			envVars[sanitizedEnvVarName] = envVarValue
+		}
+	}
+
+	for originalKey, newKey := range envConfig.Remap {
+		sanitizedOriginalKey := strings.ToUpper(strings.ReplaceAll(originalKey, "-", "_"))
+		sanitizedNewKey := strings.ToUpper(strings.ReplaceAll(newKey, "-", "_"))
+
+		if value, exists := envVars[sanitizedOriginalKey]; exists {
+			envVars[sanitizedNewKey] = value
+			delete(envVars, sanitizedOriginalKey)
+		}
+	}
+
+	return finalizeExport(shell, envVars)
+}
+
+// ExportCommand handles exporting secrets directly from a given path
+func ExportCommand(_ context.Context, cmd *cli.Command) error {
+	if cmd.Args().Len() != 1 {
+		return fmt.Errorf("usage: crumb export <path>")
+	}
+	path := cmd.Args().Get(0)
+
+	shell := cmd.String("shell")
+	if shell == "" {
+		shell = "bash"
+	}
+
+	cfg, b, err := resolveBackend(cmd)
+	if err != nil {
+		return err
+	}
+
+	secrets, err := storage.LoadSecrets(cfg.PrivateKeyPath, b)
+	if err != nil {
+		return err
+	}
+
+	envVars := make(map[string]string)
+
+	isPathPrefix := strings.HasSuffix(path, "/")
+
+	if isPathPrefix {
+		pathPrefix := strings.TrimSuffix(path, "/")
+
+		comment := fmt.Sprintf("# Exported from %s", pathPrefix)
+		switch shell {
+		case "bash":
+			fmt.Println(comment)
+		case "fish":
+			fmt.Println(comment)
+		}
+
+		pathSecrets := storage.GetSecretsForPath(secrets, pathPrefix)
+		for secretPath, secretValue := range pathSecrets {
+			keyName := storage.ConvertPathToEnvVar(secretPath, pathPrefix)
+			if keyName != "" {
+				envVars[keyName] = secretValue
+			}
+		}
+	} else {
+		if entry, exists := storage.SecretExists(secrets, path); exists {
+			comment := fmt.Sprintf("# Exported from %s", path)
+			switch shell {
+			case "bash":
+				fmt.Println(comment)
+			case "fish":
+				fmt.Println(comment)
+			}
+
+			keyName := storage.ExtractVarName(path)
+			if keyName != "" {
+				envVars[keyName] = entry.Value
+			}
+		}
+	}
+
+	return finalizeExport(shell, envVars)
+}
+
+// finalizeExport prints the diff diagnostic and shell export statements for the collected env vars
+func finalizeExport(shell string, envVars map[string]string) error {
 	if len(envVars) == 0 {
 		return fmt.Errorf("no secrets found to export")
 	}

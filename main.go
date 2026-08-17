@@ -171,8 +171,8 @@ func main() {
 				},
 			},
 			{
-				Name:  "export",
-				Usage: "Export secrets as shell-compatible environment variables",
+				Name:  "load",
+				Usage: "Load and export secrets from a .crumb.yaml project configuration",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:    "shell",
@@ -187,13 +187,23 @@ func main() {
 						Value:   ".crumb.yaml",
 					},
 					&cli.StringFlag{
-						Name:  "path",
-						Usage: "Export all secrets from a specific path (bypasses .crumb.yaml)",
-					},
-					&cli.StringFlag{
 						Name:  "env",
 						Usage: "Environment to export from .crumb.yaml (default: default)",
 						Value: "default",
+					},
+				},
+				Action: commands.LoadCommand,
+			},
+			{
+				Name:      "export",
+				Usage:     "Export secrets from a specific path as shell-compatible environment variables",
+				ArgsUsage: "<path>",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:    "shell",
+						Usage:   "Shell format (bash or fish)",
+						Value:   "bash",
+						Sources: cli.NewValueSourceChain(config.NewTomlValueSource("shell")),
 					},
 				},
 				Action: commands.ExportCommand,

@@ -26,7 +26,7 @@ func TestHookCommandIntegration(t *testing.T) {
 			wantContains: []string{
 				"_crumb_hook()",
 				"if [ -f .crumb.yaml ]",
-				"export --shell bash",
+				"load --shell bash",
 				"PROMPT_COMMAND",
 			},
 			wantError: false,
@@ -37,7 +37,7 @@ func TestHookCommandIntegration(t *testing.T) {
 			wantContains: []string{
 				"_crumb_hook()",
 				"if [ -f .crumb.yaml ]",
-				"export --shell bash",
+				"load --shell bash",
 				"precmd_functions",
 				"chpwd_functions",
 			},
@@ -49,7 +49,7 @@ func TestHookCommandIntegration(t *testing.T) {
 			wantContains: []string{
 				"function _crumb_hook",
 				"if test -f .crumb.yaml",
-				"export --shell fish",
+				"load --shell fish",
 				"--on-variable PWD",
 				"--on-event fish_prompt",
 				"_crumb_hook",
@@ -169,9 +169,9 @@ func TestHookCommandExecutablePath(t *testing.T) {
 		t.Errorf("hook output should reference crumb executable, got: %s", output)
 	}
 
-	// Should contain the export command
-	if !strings.Contains(output, "export --shell bash") {
-		t.Errorf("hook output should contain export command, got: %s", output)
+	// Should contain the load command
+	if !strings.Contains(output, "load --shell bash") {
+		t.Errorf("hook output should contain load command, got: %s", output)
 	}
 }
 

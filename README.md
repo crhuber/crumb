@@ -38,7 +38,7 @@ crumb set /myapp/api_key
 crumb get /myapp/api_key
 
 # 5. Export secrets as environment variables
-eval "$(crumb export --path /myapp)"
+eval "$(crumb export /myapp)"
 
 # 6. List keys
 crumb ls
@@ -466,19 +466,12 @@ export CRUMB_PROFILE=work
 crumb ls  # Lists work profile secrets
 ```
 
-### Export Command
+### Load Command
 
-The `export` command exports secrets as shell-compatible environment variable assignments. It supports two modes:
-
-1. **Config-based export**: Uses a `.crumb.yaml` configuration file (traditional mode)
-2. **Direct path export**: Exports all secrets from a specific path without requiring a config file (new!)
+The `load` command exports secrets as shell-compatible environment variable assignments, driven by a `.crumb.yaml` project configuration file.
 
 ```bash
-# Config-based export
-crumb export [-f config-file] [--env environment] [--shell=bash|fish] [--profile <profile-name>]
-
-# Direct path export
-crumb export --path <secret-path> [--shell=bash|fish] [--profile <profile-name>]
+crumb load [-f config-file] [--env environment] [--shell=bash|fish] [--profile <profile-name>]
 ```
 
 #### Example Usage
@@ -494,56 +487,33 @@ environments:
     env: {}
 ```
 
-Then export the secrets:
+Then load the secrets:
 
 ```bash
-# Export default environment
-$ crumb export
+# Load default environment
+$ crumb load
 
-# Export staging environment
-$ crumb export --env staging
+# Load staging environment
+$ crumb load --env staging
 
-# Export for fish shell
-$ crumb export --shell fish
+# Load for fish shell
+$ crumb load --shell fish
 
 # Use a custom config file
-$ crumb export -f my-project.yaml
+$ crumb load -f my-project.yaml
 
 # Use custom config file
-$ crumb export --file my-project.yaml --shell fish
+$ crumb load --file my-project.yaml --shell fish
 
-# Export from work profile
-$ crumb export --profile work
+# Load from work profile
+$ crumb load --profile work
 
 # Use environment variable for profile
-$ CRUMB_PROFILE=work crumb export --shell=fish
+$ CRUMB_PROFILE=work crumb load --shell=fish
 
 # Source the output directly
-$ eval "$(crumb export)"
-
-#### Direct Path Export Examples
-
-The `--path` flag allows you to export secrets directly without a `.crumb.yaml` file:
-
-```bash
-# Export all secrets from /api path
-$ crumb export --path /myapp/dev/
-
-# Export with fish shell format
-$ crumb export --path /myapp/dev/ --shell fish
-
-# Use with different profile
-$ crumb export --path /myapp/dev/ --profile work
-
-# Source directly into shell
-$ eval "$(crumb export --path /myapp/)"
+$ eval "$(crumb load)"
 ```
-
-**Path to Variable Name Conversion**:
-- Only the final segment (actual secret name) is used, intermediate path segments are ignored
-- Hyphens in the secret name are converted to underscores, and the result is uppercase
-mgsecret
-
 
 #### Remapping Keys
 
@@ -590,6 +560,36 @@ environments:
       API_KEY: "/myapp/staging/api_key"
 ```
 
+### Export Command
+
+The `export` command exports secrets from a specific path directly, without requiring a `.crumb.yaml` file.
+
+```bash
+crumb export <secret-path> [--shell=bash|fish] [--profile <profile-name>]
+```
+
+#### Example Usage
+
+```bash
+# Export a single secret
+$ crumb export /myapp/dev/api_key
+
+# Export all secrets under a path (trailing slash)
+$ crumb export /myapp/dev/
+
+# Export with fish shell format
+$ crumb export /myapp/dev/ --shell fish
+
+# Use with a different profile
+$ crumb export /myapp/dev/ --profile work
+
+# Source directly into shell
+$ eval "$(crumb export /myapp/dev/)"
+```
+
+**Path to Variable Name Conversion**:
+- Only the final segment (actual secret name) is used, intermediate path segments are ignored
+- Hyphens in the secret name are converted to underscores, and the result is uppercase
 
 ### Hook Command
 
@@ -627,7 +627,7 @@ crumb hook --shell fish | source
 
 Once the hook is installed:
 
-1. When you enter a directory containing a `.crumb.yaml` file, the hook automatically runs `crumb export`
+1. When you enter a directory containing a `.crumb.yaml` file, the hook automatically runs `crumb load`
 2. The secrets defined in `.crumb.yaml` are loaded as environment variables
 3. When you leave the directory, the environment variables remain (they are not automatically unloaded)
 
@@ -669,7 +669,7 @@ your-database-url
 #### Notes
 
 - The hook checks for `.crumb.yaml` in the current directory only (not parent directories)
-- Errors from `crumb export` are silently suppressed (redirected to `/dev/null`)
+- Errors from `crumb load` are silently suppressed (redirected to `/dev/null`)
 - The hook preserves the exit status of the previous command (important for bash prompt functions)
 - For bash/zsh, the hook runs on each prompt display and directory change
 - For fish, the hook runs on PWD changes and prompt events

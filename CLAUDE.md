@@ -46,7 +46,8 @@ Commands:
 - `delete/rm`: Delete secrets with confirmation prompt
 - `move/mv`: Rename secret paths while preserving values
 - `init`: Create `.crumb.yaml` project configuration
-- `export`: Export secrets as shell environment variables
+- `load`: Export secrets as shell environment variables from a `.crumb.yaml` project configuration
+- `export`: Export secrets from a specific path (`crumb export <path>`) as shell environment variables
 - `storage`: Manage storage file paths per profile
 
 ## Development Commands
