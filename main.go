@@ -205,6 +205,11 @@ func main() {
 						Value:   "bash",
 						Sources: cli.NewValueSourceChain(config.NewTomlValueSource("shell")),
 					},
+					&cli.BoolFlag{
+						Name:    "interactive",
+						Aliases: []string{"i"},
+						Usage:   "Pick a secret path interactively",
+					},
 				},
 				Action: commands.ExportCommand,
 			},
