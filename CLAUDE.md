@@ -48,6 +48,7 @@ Commands:
 - `init`: Create `.crumb.yaml` project configuration
 - `load`: Export secrets as shell environment variables from a `.crumb.yaml` project configuration
 - `export`: Export secrets from a specific path (`crumb export <path>`) as shell environment variables
+- `cp/copy`: Copy secrets from a path to an external provider (e.g. GitHub Actions via `gh secret set`)
 - `storage`: Manage storage file paths per profile
 
 ## Development Commands

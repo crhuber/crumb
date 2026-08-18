@@ -214,6 +214,25 @@ func main() {
 				Action: commands.ExportCommand,
 			},
 			{
+				Name:      "copy",
+				Aliases:   []string{"cp"},
+				Usage:     "Copy secrets from a path to an external provider (e.g. GitHub Actions secrets)",
+				ArgsUsage: "<path> <destination>",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "provider",
+						Usage: "Destination provider",
+						Value: "github",
+					},
+					&cli.BoolFlag{
+						Name:    "yes",
+						Aliases: []string{"y"},
+						Usage:   "Skip confirmation prompt",
+					},
+				},
+				Action: commands.CpCommand,
+			},
+			{
 				Name:      "hook",
 				Usage:     "Output shell hook script for automatic secret loading",
 				ArgsUsage: "<shell>",

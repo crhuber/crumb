@@ -594,6 +594,24 @@ $ crumb export -i
 - Only the final segment (actual secret name) is used, intermediate path segments are ignored
 - Hyphens in the secret name are converted to underscores, and the result is uppercase
 
+### Copy Command
+
+The `copy` (alias `cp`) command copies secrets from a path directly to an external provider. It currently supports GitHub Actions repository secrets by wrapping the `gh` CLI, which must be installed and authenticated (`gh auth login`).
+
+```bash
+crumb copy <secret-path> <destination> [--provider github] [--yes|-y]
+```
+
+#### Example Usage
+
+```bash
+# Copy a single secret to a GitHub repo's Actions secrets
+$ crumb copy /myapp/dev/api_key owner/repo --provider github
+
+# Copy all secrets under a path (trailing slash) — prompts for confirmation
+$ crumb copy /myapp/dev/ owner/repo --provider github
+```
+
 ### Hook Command
 
 The `hook` command generates shell integration scripts that automatically load secrets when you enter a directory containing a `.crumb.yaml` file. This provides seamless, automatic environment variable management similar to direnv.
