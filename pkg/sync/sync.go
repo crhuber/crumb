@@ -76,11 +76,17 @@ func Run(ctx context.Context, profile string, cfg *config.ProfileConfig, b backe
 		result.Merged = true
 	}
 
-	newVersion, merged, err := pushWithRetry(ctx, client, cfg, remoteVersion, base, local, merged, &result)
-	if err != nil {
-		return Result{}, err
+	var newVersion int
+	if storesEqual(merged, remote) {
+		newVersion = remoteVersion
+		merged = remote
+	} else {
+		newVersion, merged, err = pushWithRetry(ctx, client, cfg, remoteVersion, base, local, merged, &result)
+		if err != nil {
+			return Result{}, err
+		}
+		result.Pushed = true
 	}
-	result.Pushed = true
 	result.LocalVersion = newVersion
 
 	if err := storage.SaveSecrets(merged, cfg.PublicKeyPath, b); err != nil {

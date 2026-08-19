@@ -156,6 +156,51 @@ func TestMerge_FirstSyncNoBase(t *testing.T) {
 	}
 }
 
+func TestStoresEqual_SameContentDifferentUpdated(t *testing.T) {
+	a := storage.SecretStore{"/a": entry("1", "2026-01-01T00:00:00Z")}
+	b := storage.SecretStore{"/a": entry("1", "2026-02-02T00:00:00Z")}
+
+	if !storesEqual(a, b) {
+		t.Fatalf("expected stores with same Value/Expires but different Updated to be equal")
+	}
+}
+
+func TestStoresEqual_DifferentValue(t *testing.T) {
+	a := storage.SecretStore{"/a": entry("1", "2026-01-01T00:00:00Z")}
+	b := storage.SecretStore{"/a": entry("2", "2026-01-01T00:00:00Z")}
+
+	if storesEqual(a, b) {
+		t.Fatalf("expected stores with different values to be unequal")
+	}
+}
+
+func TestStoresEqual_DifferentKeys(t *testing.T) {
+	a := storage.SecretStore{"/a": entry("1", "2026-01-01T00:00:00Z")}
+	b := storage.SecretStore{"/b": entry("1", "2026-01-01T00:00:00Z")}
+
+	if storesEqual(a, b) {
+		t.Fatalf("expected stores with different keys to be unequal")
+	}
+}
+
+func TestStoresEqual_DifferentLength(t *testing.T) {
+	a := storage.SecretStore{
+		"/a": entry("1", "2026-01-01T00:00:00Z"),
+		"/b": entry("1", "2026-01-01T00:00:00Z"),
+	}
+	b := storage.SecretStore{"/a": entry("1", "2026-01-01T00:00:00Z")}
+
+	if storesEqual(a, b) {
+		t.Fatalf("expected stores of different length to be unequal")
+	}
+}
+
+func TestStoresEqual_BothEmpty(t *testing.T) {
+	if !storesEqual(storage.SecretStore{}, storage.SecretStore{}) {
+		t.Fatalf("expected two empty stores to be equal")
+	}
+}
+
 func TestMerge_BothCreateSameKeyFresh(t *testing.T) {
 	base := storage.SecretStore{}
 	local := storage.SecretStore{"/a": entry("local", "2026-01-02T00:00:00Z")}
