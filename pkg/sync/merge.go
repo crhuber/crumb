@@ -77,6 +77,22 @@ func Merge(base, local, remote storage.SecretStore) (storage.SecretStore, []stri
 	return merged, conflicts
 }
 
+// storesEqual reports whether a and b hold the same keys with the same
+// Value/Expires content, ignoring Updated timestamps (which can legitimately
+// differ between independently-loaded copies of the same secret).
+func storesEqual(a, b storage.SecretStore) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, av := range a {
+		bv, ok := b[k]
+		if !entryEqual(true, av, ok, bv) {
+			return false
+		}
+	}
+	return true
+}
+
 func entryEqual(aOK bool, a storage.SecretEntry, bOK bool, b storage.SecretEntry) bool {
 	if aOK != bOK {
 		return false

@@ -273,6 +273,8 @@ func printSyncResult(result sync.Result) {
 		}
 	case result.Merged:
 		fmt.Println("Synced (merged remote changes).")
+	case !result.Pushed:
+		fmt.Println("Already up to date.")
 	default:
 		fmt.Println("Synced.")
 	}
