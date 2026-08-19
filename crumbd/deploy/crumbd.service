@@ -1,0 +1,18 @@
+[Unit]
+Description=crumbd sync server
+After=network.target
+
+[Service]
+User=crumbd
+Group=crumbd
+ExecStart=/usr/local/bin/crumbd --config /etc/crumbd/config.yaml
+WorkingDirectory=/var/lib/crumbd
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/crumbd
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

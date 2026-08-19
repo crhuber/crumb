@@ -49,7 +49,6 @@ func StorageSetCommand(_ context.Context, cmd *cli.Command) error {
 	// Update local storage path
 	expandedPath := config.ExpandTilde(storagePath)
 	profileConfig.Storage.Local = &config.LocalStorageConfig{Path: expandedPath}
-	profileConfig.Storage.S3 = nil // Clear S3 if switching to local
 	cfg.Profiles[profile] = profileConfig
 
 	if err := config.SaveConfig(&cfg); err != nil {
@@ -68,19 +67,11 @@ func StorageGetCommand(_ context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	if cfg.Storage.S3 != nil {
-		s3 := cfg.Storage.S3
-		fmt.Printf("Storage: s3://%s/%s (profile: %s)\n", s3.Bucket, s3.Key, profile)
-		if s3.EndpointURL != "" {
-			fmt.Printf("Endpoint: %s\n", s3.EndpointURL)
-		}
-	} else {
-		path := config.GetLocalStoragePath(cfg)
-		if path == "" {
-			path = filepath.Join(os.Getenv("HOME"), ".config", "crumb", "secrets")
-		}
-		fmt.Printf("Storage: %s (profile: %s)\n", path, profile)
+	path := config.GetLocalStoragePath(cfg)
+	if path == "" {
+		path = filepath.Join(os.Getenv("HOME"), ".config", "crumb", "secrets")
 	}
+	fmt.Printf("Storage: %s (profile: %s)\n", path, profile)
 	return nil
 }
 

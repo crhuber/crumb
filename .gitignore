@@ -1,5 +1,3 @@
-prd.markdown
-todo.markdown
 # Compiled binary
 dist/
 build/
@@ -7,3 +5,7 @@ crumb
 .crumb.yaml
 ./build/
 ./coverage/
+
+# crumbd
+crumbd/crumbd
+crumbd/crumbd.db*
