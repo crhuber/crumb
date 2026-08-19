@@ -24,17 +24,18 @@ type LocalStorageConfig struct {
 	Path string `yaml:"path"`
 }
 
-// S3StorageConfig holds settings for S3-compatible storage.
-type S3StorageConfig struct {
-	Bucket      string `yaml:"bucket"`
-	Key         string `yaml:"key"`
-	EndpointURL string `yaml:"endpoint_url,omitempty"`
-}
-
 // StorageConfig holds the backend-specific storage settings.
 type StorageConfig struct {
 	Local *LocalStorageConfig `yaml:"local,omitempty"`
-	S3    *S3StorageConfig    `yaml:"s3,omitempty"`
+}
+
+// SyncConfig holds settings for syncing a profile's secrets with a self-hosted crumbd server.
+type SyncConfig struct {
+	ServerURL        string `yaml:"server_url"`
+	VaultID          string `yaml:"vault_id"`
+	DeviceID         string `yaml:"device_id"`
+	SessionToken     string `yaml:"session_token,omitempty"`
+	SessionExpiresAt string `yaml:"session_expires_at,omitempty"`
 }
 
 // ProfileConfig represents a single profile configuration
@@ -42,6 +43,7 @@ type ProfileConfig struct {
 	PublicKeyPath  string        `yaml:"public_key_path"`
 	PrivateKeyPath string        `yaml:"private_key_path"`
 	Storage        StorageConfig `yaml:"storage"`
+	Sync           *SyncConfig   `yaml:"sync,omitempty"`
 }
 
 // CrumbConfig represents the per-project configuration in .crumb.yaml

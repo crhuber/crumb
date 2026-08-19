@@ -1,6 +1,6 @@
 # Crumb - Secret Management Tool
 
-`crumb` is a command line tool designed to securely store, manage, and export API keys and secrets for developers. It uses `age` encryption with SSH public/private key pairs, and supports both local file storage and S3-compatible backends (AWS S3, MinIO, LocalStack).
+`crumb` is a command line tool designed to securely store, manage, and export API keys and secrets for developers. It uses `age` encryption with SSH public/private key pairs, storing secrets in a local encrypted file that can be synced across machines via a self-hosted `crumbd` server.
 
 `crumb` is inspired by tools such as:
 
@@ -47,7 +47,7 @@ crumb ls
 ## Features
 
 - **SSH Key Encryption/Decryption**: Securely encrypt your password storage file using SSH Keys
-- **S3 Storage Backend**: Store encrypted secrets in AWS S3 or S3-compatible services (MinIO, LocalStack)
+- **Multi-machine Sync**: Sync encrypted secrets between machines via a self-hosted `crumbd` server (`crumb sync`)
 - **Bulk Export**: Exports multiple secrets from an entire path like `/myapp/dev/`
 - **Multi-Profile Support**: Manage separate secret stores for work, personal, or different projects
 - **.env Import**: Import multiple secrets from `.env` files
@@ -90,11 +90,6 @@ ssh-keygen -t ed25519 -C "your_email@example.com"
 **Default setup:**
 ```bash
 $ crumb setup
-```
-
-**Setup with S3 storage:**
-```bash
-$ crumb setup --storage s3 --s3-bucket my-secrets-bucket --s3-key /crumb/secrets
 ```
 
 **Setup with non default profile**
@@ -442,6 +437,99 @@ Example:
 # Clear custom storage path for work profile
 $ crumb --profile work storage clear
 Storage path cleared for profile: work (using default)
+```
+
+### Sync Commands
+
+The `sync` command group syncs a profile's secrets with a self-hosted [`crumbd`](crumbd/README.md) server, so the same profile can be used from multiple machines. See [crumbd's README](crumbd/README.md#how-sync-works) for how conflicts are resolved. All machines sharing a profile must use the same SSH keypair, since crumb encrypts to a single recipient key.
+
+#### Sync Init
+
+Configure the current profile to sync with a server — either creating a brand-new vault, or joining one that already exists via an invite token:
+
+```bash
+crumb sync init --server <url> [--invite <token>] [--profile <profile-name>]
+```
+
+| Flag | Required | Description |
+|---|---|---|
+| `--server` | yes | The `crumbd` server URL, e.g. `https://sync.example.com` |
+| `--invite` | no | An invite token from `crumb sync invite` on another machine. Omit to create a new vault instead. |
+
+Example — first machine, creating a new vault (and pushing any secrets it already has as the starting point):
+```bash
+$ crumb sync init --server https://sync.example.com
+Created new vault 43cd2c16-ee52-41ea-b62e-926934e9272f and registered this device as owner.
+Synced.
+Now at version 1.
+```
+
+Example — second machine, joining that vault:
+```bash
+$ crumb sync init --server https://sync.example.com --invite 43cd2c16-ee52-41ea-b62e-926934e9272f.vzTKUHZ...
+Joined vault 43cd2c16-ee52-41ea-b62e-926934e9272f.
+Synced (merged remote changes).
+Now at version 1.
+```
+
+#### Sync Invite
+
+Mint a one-time invite token for adding another machine to the current profile's vault:
+
+```bash
+crumb sync invite [--max-uses <n>] [--ttl <duration>] [--profile <profile-name>]
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--max-uses` | `1` | How many times the invite can be used |
+| `--ttl` | `15m` | How long the invite stays valid, e.g. `15m`, `1h` |
+
+Example:
+```bash
+$ crumb sync invite
+Invite (expires 2026-08-19T09:29:04Z, max 1 use(s)):
+
+  43cd2c16-ee52-41ea-b62e-926934e9272f.vzTKUHZumzW7OOg+Vd16v00j7JvUDdTZskMc2zBNyJQ=
+
+On the other machine, run:
+  crumb sync init --server https://sync.example.com --invite 43cd2c16-ee52-41ea-b62e-926934e9272f.vzTKUHZumzW7OOg+Vd16v00j7JvUDdTZskMc2zBNyJQ=
+```
+
+#### Sync Status
+
+Show this profile's sync configuration and whether it's up to date, without changing anything:
+
+```bash
+crumb sync status [--profile <profile-name>]
+```
+
+Example:
+```bash
+$ crumb sync status
+Profile:    default
+Server:     https://sync.example.com
+Vault ID:   43cd2c16-ee52-41ea-b62e-926934e9272f
+Device ID:  a301c633-368f-42e6-8f3d-3d20b0ebca67
+Last sync:  2026-08-19T09:13:56Z (local version 1)
+Remote version: 1
+Up to date.
+```
+
+#### Sync
+
+Push local changes, pull remote changes, and merge if anyone else has synced since this machine's last sync:
+
+```bash
+crumb sync [--profile <profile-name>]
+```
+
+Example:
+```bash
+$ crumb sync
+Synced (merged, 1 key(s) changed on both sides — newest write won):
+  /shared/key
+Now at version 11.
 ```
 
 ## Profile Management

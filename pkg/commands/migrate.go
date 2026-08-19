@@ -113,16 +113,6 @@ func backupStorage(b backend.Backend, encryptedData []byte) (string, error) {
 			return "", err
 		}
 		return backupPath, nil
-	case *backend.S3Backend:
-		backupBackend := &backend.S3Backend{
-			Bucket:      fb.Bucket,
-			Key:         fb.Key + ".bak",
-			EndpointURL: fb.EndpointURL,
-		}
-		if err := backupBackend.Write(encryptedData); err != nil {
-			return "", err
-		}
-		return fmt.Sprintf("s3://%s/%s.bak", fb.Bucket, fb.Key), nil
 	default:
 		return "", nil
 	}

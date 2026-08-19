@@ -60,74 +60,33 @@ func SetupCommand(_ context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("invalid or missing SSH key pair. Please generate an SSH key pair using `ssh-keygen -t rsa` or `ssh-keygen -t ed25519` first: %w", err)
 	}
 
-	// Determine storage backend type
-	storageType := cmd.String("storage")
-	if storageType == "" {
-		storageType = "local"
-	}
-
 	var profileConfig config.ProfileConfig
 	profileConfig.PublicKeyPath = publicKeyPath
 	profileConfig.PrivateKeyPath = privateKeyPath
 
-	var b backend.Backend
-
-	switch storageType {
-	case "s3":
-		bucket := cmd.String("s3-bucket")
-		key := cmd.String("s3-key")
-		endpointURL := cmd.String("s3-endpoint-url")
-
-		if bucket == "" {
-			return fmt.Errorf("--s3-bucket is required when using S3 storage")
+	var storagePath string
+	if profile == "default" {
+		storagePath = filepath.Join(os.Getenv("HOME"), ".config", "crumb", "secrets")
+	} else {
+		defaultStorage := fmt.Sprintf("~/.config/crumb/secrets-%s", profile)
+		storagePath, err = config.PromptForInput(fmt.Sprintf("Enter storage file path (e.g., %s): ", defaultStorage))
+		if err != nil {
+			return err
 		}
-		if key == "" {
-			return fmt.Errorf("--s3-key is required when using S3 storage")
+		if strings.TrimSpace(storagePath) == "" {
+			storagePath = defaultStorage
 		}
-
-		s3Backend := &backend.S3Backend{
-			Bucket:      bucket,
-			Key:         key,
-			EndpointURL: endpointURL,
-		}
-
-		// Verify S3 connectivity
-		if _, err := s3Backend.Exists(); err != nil {
-			return fmt.Errorf("failed to connect to S3: %w", err)
-		}
-
-		profileConfig.Storage.S3 = &config.S3StorageConfig{
-			Bucket:      bucket,
-			Key:         key,
-			EndpointURL: endpointURL,
-		}
-		b = s3Backend
-
-	default: // "local"
-		var storagePath string
-		if profile == "default" {
-			storagePath = filepath.Join(os.Getenv("HOME"), ".config", "crumb", "secrets")
-		} else {
-			defaultStorage := fmt.Sprintf("~/.config/crumb/secrets-%s", profile)
-			storagePath, err = config.PromptForInput(fmt.Sprintf("Enter storage file path (e.g., %s): ", defaultStorage))
-			if err != nil {
-				return err
-			}
-			if strings.TrimSpace(storagePath) == "" {
-				storagePath = defaultStorage
-			}
-		}
-		storagePath = config.ExpandTilde(storagePath)
-
-		// Create storage directory if it doesn't exist
-		storageDir := filepath.Clean(filepath.Dir(storagePath))
-		if err := os.MkdirAll(storageDir, 0700); err != nil {
-			return fmt.Errorf("failed to create storage directory: %w", err)
-		}
-
-		profileConfig.Storage.Local = &config.LocalStorageConfig{Path: storagePath}
-		b = &backend.FileBackend{Path: storagePath}
 	}
+	storagePath = config.ExpandTilde(storagePath)
+
+	// Create storage directory if it doesn't exist
+	storageDir := filepath.Clean(filepath.Dir(storagePath))
+	if err := os.MkdirAll(storageDir, 0700); err != nil {
+		return fmt.Errorf("failed to create storage directory: %w", err)
+	}
+
+	profileConfig.Storage.Local = &config.LocalStorageConfig{Path: storagePath}
+	b := &backend.FileBackend{Path: storagePath}
 
 	// Load existing config or create new one
 	var cfg config.Config
@@ -156,9 +115,7 @@ func SetupCommand(_ context.Context, cmd *cli.Command) error {
 
 	fmt.Printf("Setup completed successfully for profile '%s'!\n", profile)
 	fmt.Printf("Config file: %s\n", configPath)
-	if profileConfig.Storage.S3 != nil {
-		fmt.Printf("Storage: s3://%s/%s\n", profileConfig.Storage.S3.Bucket, profileConfig.Storage.S3.Key)
-	} else if profileConfig.Storage.Local != nil {
+	if profileConfig.Storage.Local != nil {
 		fmt.Printf("Storage file: %s\n", profileConfig.Storage.Local.Path)
 	}
 

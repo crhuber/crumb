@@ -1,0 +1,42 @@
+# crumbd configuration. Copy to /etc/crumbd/config.yaml and edit, or leave
+# unset and configure entirely via CRUMBD_* environment variables (see
+# README.md). Any field left out here falls back to its default.
+
+# Address crumbd's HTTP server listens on. Bind to localhost and put a
+# reverse proxy (Caddy/nginx) in front for TLS - see README.md.
+listen_addr: "127.0.0.1:8420"
+
+# Path to the SQLite database file. The directory must exist and be
+# writable by the user crumbd runs as.
+database_path: "/var/lib/crumbd/crumbd.db"
+
+# Who may create a new vault (POST /api/v0/vaults):
+#   open   - anyone who can reach the server (fine only if you also trust
+#            everyone who can reach it, e.g. a private network)
+#   token  - caller must present the registration_token below as a bearer
+#            token (recommended for a personal/self-hosted server)
+#   closed - vault creation is disabled entirely; use this once you've
+#            created the vault(s) you need
+registration_mode: "token"
+
+# Required when registration_mode is "token". Treat this as a secret -
+# whoever has it can create new vaults on this server. Generate one with:
+#   openssl rand -base64 32
+registration_token: "CHANGE-ME"
+
+# Maximum size, in bytes, of a single pushed secrets blob. 8 MiB is far
+# more than any realistic secrets store needs; lower it if you want a
+# tighter cap.
+max_blob_size: 8388608
+
+# How long a bearer session stays valid after the SSH-signature
+# challenge/response handshake, before a device must re-authenticate.
+session_ttl: 1h
+
+# How long an issued auth challenge (nonce) stays valid before it must be
+# answered.
+challenge_ttl: 2m
+
+# How long an invite code (from `crumb sync invite`) stays valid by
+# default, when the client doesn't request a specific TTL.
+invite_ttl: 15m

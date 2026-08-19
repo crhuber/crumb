@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/urfave/cli/v3"
 
@@ -39,25 +40,6 @@ func main() {
 				Name:   "setup",
 				Usage:  "Initialize the secure storage backend",
 				Action: commands.SetupCommand,
-				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:  "storage",
-						Usage: "Storage backend type (local or s3)",
-						Value: "local",
-					},
-					&cli.StringFlag{
-						Name:  "s3-bucket",
-						Usage: "S3 bucket name (required for s3 storage)",
-					},
-					&cli.StringFlag{
-						Name:  "s3-key",
-						Usage: "S3 object key path (required for s3 storage)",
-					},
-					&cli.StringFlag{
-						Name:  "s3-endpoint-url",
-						Usage: "Custom S3 endpoint URL (for MinIO, LocalStack, etc.)",
-					},
-				},
 			},
 			{
 				Name:      "list",
@@ -275,6 +257,51 @@ func main() {
 						Name:   "edit",
 						Usage:  "Edit secrets in your default editor",
 						Action: commands.StorageEditCommand,
+					},
+				},
+			},
+			{
+				Name:   "sync",
+				Usage:  "Sync secrets with a self-hosted crumbd server",
+				Action: commands.SyncCommand,
+				Commands: []*cli.Command{
+					{
+						Name:   "init",
+						Usage:  "Configure this profile for sync: create a new vault, or join one via --invite",
+						Action: commands.SyncInitCommand,
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:     "server",
+								Usage:    "crumbd server URL (e.g. https://sync.example.com)",
+								Required: true,
+							},
+							&cli.StringFlag{
+								Name:  "invite",
+								Usage: "Invite token from 'crumb sync invite' on another device; omit to create a new vault",
+							},
+						},
+					},
+					{
+						Name:   "invite",
+						Usage:  "Create a one-time invite token for adding another device to this profile's vault",
+						Action: commands.SyncInviteCommand,
+						Flags: []cli.Flag{
+							&cli.IntFlag{
+								Name:  "max-uses",
+								Usage: "Maximum number of times the invite can be used",
+								Value: 1,
+							},
+							&cli.DurationFlag{
+								Name:  "ttl",
+								Usage: "How long the invite stays valid (e.g. 15m, 1h)",
+								Value: 15 * time.Minute,
+							},
+						},
+					},
+					{
+						Name:   "status",
+						Usage:  "Show this profile's sync configuration and whether it's up to date",
+						Action: commands.SyncStatusCommand,
 					},
 				},
 			},

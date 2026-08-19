@@ -53,7 +53,12 @@ func LoadSecrets(privateKeyPath string, b backend.Backend) (SecretStore, error) 
 		return nil, fmt.Errorf("failed to decrypt secrets: %w", err)
 	}
 
-	content := strings.TrimSpace(decryptedData)
+	return decodeSecrets(decryptedData)
+}
+
+// decodeSecrets parses decrypted TOML or legacy content into a SecretStore.
+func decodeSecrets(content string) (SecretStore, error) {
+	content = strings.TrimSpace(content)
 	if content == "" {
 		return make(SecretStore), nil
 	}
@@ -67,22 +72,54 @@ func LoadSecrets(privateKeyPath string, b backend.Backend) (SecretStore, error) 
 
 // SaveSecrets encrypts and saves secrets to the given backend.
 func SaveSecrets(secrets SecretStore, publicKeyPath string, b backend.Backend) error {
-	recipient, err := crypto.ParseSSHPublicKey(publicKeyPath)
+	encryptedData, err := EncryptSecrets(secrets, publicKeyPath)
 	if err != nil {
 		return err
+	}
+	return b.Write(encryptedData)
+}
+
+// EncryptSecrets serializes and encrypts a SecretStore into an age-encrypted
+// blob, without writing it to any Backend. Used by the sync client, which
+// exchanges blobs directly with a crumbd server rather than through a
+// Backend.
+func EncryptSecrets(secrets SecretStore, publicKeyPath string) ([]byte, error) {
+	recipient, err := crypto.ParseSSHPublicKey(publicKeyPath)
+	if err != nil {
+		return nil, err
 	}
 
 	content, err := serializeSecrets(secrets)
 	if err != nil {
-		return fmt.Errorf("failed to serialize secrets: %w", err)
+		return nil, fmt.Errorf("failed to serialize secrets: %w", err)
 	}
 
 	encryptedData, err := crypto.EncryptData(content, []age.Recipient{recipient})
 	if err != nil {
-		return fmt.Errorf("failed to encrypt secrets: %w", err)
+		return nil, fmt.Errorf("failed to encrypt secrets: %w", err)
 	}
 
-	return b.Write(encryptedData)
+	return encryptedData, nil
+}
+
+// DecryptSecrets decrypts and parses an age-encrypted blob into a
+// SecretStore. A nil/empty blob decrypts to an empty store.
+func DecryptSecrets(encryptedData []byte, privateKeyPath string) (SecretStore, error) {
+	if len(encryptedData) == 0 {
+		return make(SecretStore), nil
+	}
+
+	identity, err := crypto.ParseSSHPrivateKey(privateKeyPath)
+	if err != nil {
+		return nil, err
+	}
+
+	decryptedData, err := crypto.DecryptData(encryptedData, identity)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt secrets: %w", err)
+	}
+
+	return decodeSecrets(decryptedData)
 }
 
 // CreateEmptyStorage creates an empty encrypted storage via the given backend.
