@@ -343,7 +343,7 @@ crumb migrate [--profile <profile-name>]
 
 ```bash
 $ crumb migrate
-Backed up to /Users/username/.config/crumb/secrets.bak
+Backed up to /Users/username/.config/crumb/vault.age.bak
 Migrated 12 secrets to TOML format.
 ```
 
@@ -398,10 +398,10 @@ crumb storage set <path> [--profile <profile-name>]
 Example:
 ```bash
 # Set storage path for work profile
-$ crumb --profile work storage set ~/.config/crumb/work-secrets
+$ crumb --profile work storage set ~/.config/crumb/work-vault.age
 
 # Set storage path for default profile
-$ crumb storage set ~/personal-secrets
+$ crumb storage set ~/personal-vault.age
 ```
 
 #### Storage Get
@@ -416,11 +416,11 @@ Example:
 ```bash
 # Check storage path for work profile
 $ crumb --profile work storage get
-Storage: /Users/username/.config/crumb/work-secrets (profile: work)
+Storage: /Users/username/.config/crumb/work-vault.age (profile: work)
 
 # Check storage path for default profile
 $ crumb storage get
-Storage: /Users/username/.config/crumb/secrets (profile: default)
+Storage: /Users/username/.config/crumb/vault.age (profile: default)
 
 ```
 

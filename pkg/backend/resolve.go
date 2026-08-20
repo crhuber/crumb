@@ -15,7 +15,7 @@ func ResolveBackend(profile *config.ProfileConfig) (Backend, error) {
 		path = profile.Storage.Local.Path
 	}
 	if path == "" {
-		path = filepath.Join(os.Getenv("HOME"), ".config", "crumb", "secrets")
+		path = filepath.Join(os.Getenv("HOME"), ".config", "crumb", config.DefaultStorageFilename)
 	}
 	path = config.ExpandTilde(path)
 
