@@ -56,18 +56,13 @@ func LoadSecrets(privateKeyPath string, b backend.Backend) (SecretStore, error) 
 	return decodeSecrets(decryptedData)
 }
 
-// decodeSecrets parses decrypted TOML or legacy content into a SecretStore.
+// decodeSecrets parses decrypted TOML content into a SecretStore.
 func decodeSecrets(content string) (SecretStore, error) {
 	content = strings.TrimSpace(content)
 	if content == "" {
 		return make(SecretStore), nil
 	}
-
-	format := detectFormat(content)
-	if format == "toml" {
-		return parseSecretsToml(content)
-	}
-	return parseLegacySecrets(content), nil
+	return parseSecretsToml(content)
 }
 
 // SaveSecrets encrypts and saves secrets to the given backend.
@@ -176,39 +171,13 @@ func ExtractVarName(keyPath string) string {
 	return ""
 }
 
-// ParseSecrets parses decrypted content into a SecretStore.
-// Supports both TOML and legacy key=value formats.
-func ParseSecrets(content string) SecretStore {
+// ParseSecrets parses decrypted TOML content into a SecretStore.
+func ParseSecrets(content string) (SecretStore, error) {
 	content = strings.TrimSpace(content)
 	if content == "" {
-		return make(SecretStore)
+		return make(SecretStore), nil
 	}
-	format := detectFormat(content)
-	if format == "toml" {
-		store, err := parseSecretsToml(content)
-		if err != nil {
-			return make(SecretStore)
-		}
-		return store
-	}
-	return parseLegacySecrets(content)
-}
-
-// DetectFormat returns "toml" or "legacy" based on content inspection.
-func DetectFormat(content string) string {
-	return detectFormat(content)
-}
-
-func detectFormat(content string) string {
-	content = strings.TrimSpace(content)
-	if content == "" {
-		return "toml"
-	}
-	var store SecretStore
-	if _, err := toml.Decode(content, &store); err == nil && len(store) > 0 {
-		return "toml"
-	}
-	return "legacy"
+	return parseSecretsToml(content)
 }
 
 // parseSecretsToml parses TOML-formatted secrets content.
@@ -226,34 +195,6 @@ func parseSecretsToml(content string) (SecretStore, error) {
 		store[key] = entry
 	}
 	return store, nil
-}
-
-// ParseLegacySecrets parses the old key=value format into a SecretStore.
-func ParseLegacySecrets(content string) SecretStore {
-	return parseLegacySecrets(content)
-}
-
-func parseLegacySecrets(content string) SecretStore {
-	secrets := make(SecretStore)
-	lines := strings.Split(strings.TrimSpace(content), "\n")
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			continue
-		}
-
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-		secrets[key] = SecretEntry{Value: value}
-	}
-
-	return secrets
 }
 
 // serializeSecrets converts a SecretStore to a TOML string.

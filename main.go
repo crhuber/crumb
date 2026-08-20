@@ -114,11 +114,6 @@ func main() {
 				},
 			},
 			{
-				Name:   "migrate",
-				Usage:  "Migrate secrets from legacy key=value format to TOML format",
-				Action: commands.MigrateCommand,
-			},
-			{
 				Name:      "delete",
 				Aliases:   []string{"rm"},
 				Usage:     "Delete a secret key-value pair",

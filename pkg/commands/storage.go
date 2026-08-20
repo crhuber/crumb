@@ -202,8 +202,11 @@ func StorageEditCommand(_ context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to read edited file: %w", err)
 	}
 
-	// Parse edited secrets (supports both TOML and legacy formats)
-	newSecrets := storage.ParseSecrets(string(editedData))
+	// Parse edited secrets
+	newSecrets, err := storage.ParseSecrets(string(editedData))
+	if err != nil {
+		return fmt.Errorf("failed to parse edited secrets: %w", err)
+	}
 
 	// Save re-encrypted secrets
 	if err := storage.SaveSecrets(newSecrets, cfg.PublicKeyPath, b); err != nil {
