@@ -331,22 +331,6 @@ Updated: 2026-05-01T10:30:00Z
 Expires: (none)
 ```
 
-### Migrate Command
-
-The `migrate` command converts secrets from the legacy `key=value` format to the new TOML-based storage format. A backup of the encrypted file is created before migration.
-
-```bash
-crumb migrate [--profile <profile-name>]
-```
-
-#### Example Usage
-
-```bash
-$ crumb migrate
-Backed up to /Users/username/.config/crumb/vault.age.bak
-Migrated 12 secrets to TOML format.
-```
-
 ### Import Command
 
 The `import` command allows you to import multiple secrets from a `.env` file into your encrypted storage. This is particularly useful when migrating from `.env` files to Crumb or when setting up a new project with existing environment variables.

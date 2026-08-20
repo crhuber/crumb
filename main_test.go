@@ -441,10 +441,18 @@ environments:
 
 // Test secret parsing and formatting
 func TestSecretParsing(t *testing.T) {
-	secretsContent := `/prod/billing-svc/vars/mg=secret123
-/prod/billing-svc/vars/stripe=sk_test_123
-/prod/auth-svc/api_key=api_key_456
-/dev/test=value`
+	secretsContent := `["prod/billing-svc/vars/mg"]
+value = "secret123"
+
+["prod/billing-svc/vars/stripe"]
+value = "sk_test_123"
+
+["prod/auth-svc/api_key"]
+value = "api_key_456"
+
+["dev/test"]
+value = "value"
+`
 
 	expected := map[string]string{
 		"/prod/billing-svc/vars/mg":     "secret123",
@@ -453,7 +461,10 @@ func TestSecretParsing(t *testing.T) {
 		"/dev/test":                     "value",
 	}
 
-	result := storage.ParseSecrets(secretsContent)
+	result, err := storage.ParseSecrets(secretsContent)
+	if err != nil {
+		t.Fatalf("ParseSecrets() error: %v", err)
+	}
 
 	if len(result) != len(expected) {
 		t.Errorf("Expected %d secrets, got %d", len(expected), len(result))

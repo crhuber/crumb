@@ -120,67 +120,6 @@ func TestSerializeSecretsMultiline(t *testing.T) {
 	}
 }
 
-func TestDetectFormat(t *testing.T) {
-	tests := []struct {
-		name     string
-		content  string
-		expected string
-	}{
-		{
-			name:     "empty content",
-			content:  "",
-			expected: "toml",
-		},
-		{
-			name: "toml content",
-			content: `["app1/db"]
-value = "secret"
-updated = "2026-05-01T10:30:00Z"
-expires = ""`,
-			expected: "toml",
-		},
-		{
-			name:     "legacy content",
-			content:  "/prod/key=value123\n/dev/key=value456",
-			expected: "legacy",
-		},
-		{
-			name:     "single legacy line",
-			content:  "/test/key=myvalue",
-			expected: "legacy",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := detectFormat(tt.content)
-			if result != tt.expected {
-				t.Errorf("detectFormat() = %q, want %q", result, tt.expected)
-			}
-		})
-	}
-}
-
-func TestParseLegacySecrets(t *testing.T) {
-	content := "/prod/key1=value1\n/prod/key2=value2\n/dev/key3=value=with=equals"
-
-	store := parseLegacySecrets(content)
-
-	if len(store) != 3 {
-		t.Fatalf("Expected 3 entries, got %d", len(store))
-	}
-
-	if store["/prod/key1"].Value != "value1" {
-		t.Errorf("Expected 'value1', got %q", store["/prod/key1"].Value)
-	}
-	if store["/dev/key3"].Value != "value=with=equals" {
-		t.Errorf("Expected 'value=with=equals', got %q", store["/dev/key3"].Value)
-	}
-	if store["/prod/key1"].Updated != "" {
-		t.Errorf("Legacy entries should have empty Updated, got %q", store["/prod/key1"].Updated)
-	}
-}
-
 func TestSetSecret(t *testing.T) {
 	store := make(SecretStore)
 	SetSecret(store, "/test/key", "myvalue")
@@ -259,18 +198,10 @@ value = "secret123"
 updated = "2026-05-01T10:30:00Z"
 expires = ""`
 
-		store := ParseSecrets(content)
-		if len(store) != 1 {
-			t.Fatalf("Expected 1 entry, got %d", len(store))
+		store, err := ParseSecrets(content)
+		if err != nil {
+			t.Fatalf("ParseSecrets() error: %v", err)
 		}
-		if store["/test/key"].Value != "secret123" {
-			t.Errorf("Expected 'secret123', got %q", store["/test/key"].Value)
-		}
-	})
-
-	t.Run("legacy input", func(t *testing.T) {
-		content := "/test/key=secret123"
-		store := ParseSecrets(content)
 		if len(store) != 1 {
 			t.Fatalf("Expected 1 entry, got %d", len(store))
 		}
@@ -280,7 +211,10 @@ expires = ""`
 	})
 
 	t.Run("empty input", func(t *testing.T) {
-		store := ParseSecrets("")
+		store, err := ParseSecrets("")
+		if err != nil {
+			t.Fatalf("ParseSecrets() error: %v", err)
+		}
 		if len(store) != 0 {
 			t.Errorf("Expected empty store, got %d entries", len(store))
 		}

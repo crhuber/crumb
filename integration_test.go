@@ -303,21 +303,28 @@ func TestGetCommandIntegration(t *testing.T) {
 // Test edge cases and error handling
 func TestErrorHandling(t *testing.T) {
 	t.Run("empty secrets file", func(t *testing.T) {
-		secrets := storage.ParseSecrets("")
+		secrets, err := storage.ParseSecrets("")
+		if err != nil {
+			t.Fatalf("ParseSecrets() error: %v", err)
+		}
 		if len(secrets) != 0 {
 			t.Errorf("Expected empty secrets map, got %d entries", len(secrets))
 		}
 	})
 
-	t.Run("malformed secrets line", func(t *testing.T) {
-		secrets := storage.ParseSecrets("invalid-line-without-equals")
-		if len(secrets) != 0 {
-			t.Errorf("Expected empty secrets map for malformed line, got %d entries", len(secrets))
+	t.Run("malformed secrets content", func(t *testing.T) {
+		if _, err := storage.ParseSecrets("not valid toml content ==="); err == nil {
+			t.Error("Expected error for malformed TOML content")
 		}
 	})
 
 	t.Run("secrets with empty values", func(t *testing.T) {
-		secrets := storage.ParseSecrets("/test/key=")
+		secrets, err := storage.ParseSecrets(`["test/key"]
+value = ""
+`)
+		if err != nil {
+			t.Fatalf("ParseSecrets() error: %v", err)
+		}
 		if len(secrets) != 1 {
 			t.Errorf("Expected 1 secret, got %d", len(secrets))
 		}
@@ -327,7 +334,12 @@ func TestErrorHandling(t *testing.T) {
 	})
 
 	t.Run("secrets with equals in value", func(t *testing.T) {
-		secrets := storage.ParseSecrets("/test/key=value=with=equals")
+		secrets, err := storage.ParseSecrets(`["test/key"]
+value = "value=with=equals"
+`)
+		if err != nil {
+			t.Fatalf("ParseSecrets() error: %v", err)
+		}
 		if len(secrets) != 1 {
 			t.Errorf("Expected 1 secret, got %d", len(secrets))
 		}
