@@ -66,9 +66,9 @@ func SetupCommand(_ context.Context, cmd *cli.Command) error {
 
 	var storagePath string
 	if profile == "default" {
-		storagePath = filepath.Join(os.Getenv("HOME"), ".config", "crumb", "secrets")
+		storagePath = filepath.Join(os.Getenv("HOME"), ".config", "crumb", config.DefaultStorageFilename)
 	} else {
-		defaultStorage := fmt.Sprintf("~/.config/crumb/secrets-%s", profile)
+		defaultStorage := fmt.Sprintf("~/.config/crumb/vault-%s.age", profile)
 		storagePath, err = config.PromptForInput(fmt.Sprintf("Enter storage file path (e.g., %s): ", defaultStorage))
 		if err != nil {
 			return err

@@ -14,6 +14,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// DefaultStorageFilename is the default encrypted storage filename used
+// when a profile has no explicit Storage.Local.Path configured.
+const DefaultStorageFilename = "vault.age"
+
 // Config represents the configuration stored in ~/.config/crumb/config.yaml
 type Config struct {
 	Profiles map[string]ProfileConfig `yaml:"profiles"`

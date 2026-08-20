@@ -69,7 +69,7 @@ func StorageGetCommand(_ context.Context, cmd *cli.Command) error {
 
 	path := config.GetLocalStoragePath(cfg)
 	if path == "" {
-		path = filepath.Join(os.Getenv("HOME"), ".config", "crumb", "secrets")
+		path = filepath.Join(os.Getenv("HOME"), ".config", "crumb", config.DefaultStorageFilename)
 	}
 	fmt.Printf("Storage: %s (profile: %s)\n", path, profile)
 	return nil
