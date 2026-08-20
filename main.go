@@ -279,6 +279,11 @@ func main() {
 								Name:  "invite",
 								Usage: "Invite token from 'crumb sync invite' on another device; omit to create a new vault",
 							},
+							&cli.StringFlag{
+								Name:    "registration-token",
+								Usage:   "Registration token required by crumbd when registration_mode is 'token' (only needed when creating a new vault)",
+								Sources: cli.EnvVars("CRUMB_REGISTRATION_TOKEN"),
+							},
 						},
 					},
 					{

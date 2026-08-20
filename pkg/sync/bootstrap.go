@@ -13,8 +13,10 @@ import (
 
 // postJSON is a small standalone helper for the two bootstrap calls
 // (CreateVault, JoinVault) that happen before any session/vault exists, so
-// they can't go through HTTPClient's authenticated do/doOnce.
-func postJSON(ctx context.Context, serverURL, path string, body, out any) error {
+// they can't go through HTTPClient's authenticated do/doOnce. bearerToken is
+// sent as an Authorization header when non-empty (used by CreateVault to
+// satisfy a crumbd server running with registration_mode: token).
+func postJSON(ctx context.Context, serverURL, path, bearerToken string, body, out any) error {
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return fmt.Errorf("failed to encode request: %w", err)
@@ -25,6 +27,9 @@ func postJSON(ctx context.Context, serverURL, path string, body, out any) error 
 		return fmt.Errorf("failed to build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if bearerToken != "" {
+		req.Header.Set("Authorization", "Bearer "+bearerToken)
+	}
 
 	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
 	if err != nil {
@@ -58,13 +63,14 @@ func postJSON(ctx context.Context, serverURL, path string, body, out any) error 
 }
 
 // CreateVault creates a new vault on serverURL and registers publicKeyLine
-// as its first (owner) device.
-func CreateVault(ctx context.Context, serverURL, publicKeyLine, name, label string) (vaultID, deviceID string, err error) {
+// as its first (owner) device. registrationToken is only required when the
+// server is running with registration_mode: token; pass "" otherwise.
+func CreateVault(ctx context.Context, serverURL, publicKeyLine, name, label, registrationToken string) (vaultID, deviceID string, err error) {
 	var resp struct {
 		VaultID  string `json:"vault_id"`
 		DeviceID string `json:"device_id"`
 	}
-	if err := postJSON(ctx, serverURL, "/api/v0/vaults", map[string]string{
+	if err := postJSON(ctx, serverURL, "/api/v0/vaults", registrationToken, map[string]string{
 		"name":       name,
 		"public_key": publicKeyLine,
 		"label":      label,
@@ -81,7 +87,7 @@ func JoinVault(ctx context.Context, serverURL, vaultID, publicKeyLine, label, in
 		DeviceID string `json:"device_id"`
 		Status   string `json:"status"`
 	}
-	if err := postJSON(ctx, serverURL, "/api/v0/vaults/"+vaultID+"/devices", map[string]string{
+	if err := postJSON(ctx, serverURL, "/api/v0/vaults/"+vaultID+"/devices", "", map[string]string{
 		"public_key":  publicKeyLine,
 		"label":       label,
 		"invite_code": inviteCode,

@@ -58,6 +58,7 @@ func SyncInitCommand(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("--server is required (e.g. --server https://sync.example.com)")
 	}
 	inviteToken := strings.TrimSpace(cmd.String("invite"))
+	registrationToken := strings.TrimSpace(cmd.String("registration-token"))
 
 	pc, err := config.LoadConfig(profile)
 	if err != nil {
@@ -78,7 +79,7 @@ func SyncInitCommand(ctx context.Context, cmd *cli.Command) error {
 
 	var vaultID, deviceID string
 	if inviteToken == "" {
-		vaultID, deviceID, err = sync.CreateVault(ctx, serverURL, pubKeyLine, fmt.Sprintf("crumb-%s", profile), label)
+		vaultID, deviceID, err = sync.CreateVault(ctx, serverURL, pubKeyLine, fmt.Sprintf("crumb-%s", profile), label, registrationToken)
 		if err != nil {
 			return fmt.Errorf("failed to create vault: %w", err)
 		}
