@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="1200" height="400" role="img" aria-label="crumb: encrypted secrets, held quietly">
+  <title>crumb</title>
+
+  <!-- ground -->
+  <rect x="0" y="0" width="1200" height="400" fill="#F3F0E8"/>
+
+  <!-- table edge -->
+  <line x1="90" y1="311" x2="1110" y2="311" stroke="#34332F" stroke-width="1.2" opacity="0.45"/>
+
+  <!-- grounding shadows (flat, no blur) -->
+  <ellipse cx="176" cy="313" rx="62" ry="6" fill="#34332F" opacity="0.08"/>
+  <ellipse cx="323" cy="307" rx="46" ry="5" fill="#34332F" opacity="0.06"/>
+
+  <!-- jar -->
+  <g>
+    <path d="M120 310
+             C118 255 120 232 133 221
+             L133 209
+             C133 204 139 201 151 201
+             L199 201
+             C211 201 217 204 217 209
+             L217 221
+             C230 232 232 255 230 310
+             Z"
+          fill="#C9B99F" stroke="#34332F" stroke-width="1.6" stroke-linejoin="round"/>
+    <!-- shoulder line -->
+    <path d="M133 221 C150 227 200 227 217 221" fill="none" stroke="#34332F" stroke-width="1" opacity="0.35"/>
+    <!-- lid, seated, closed -->
+    <ellipse cx="175" cy="200" rx="31" ry="9" fill="#BBA98A" stroke="#34332F" stroke-width="1.6"/>
+    <circle cx="175" cy="193" r="4" fill="#BBA98A" stroke="#34332F" stroke-width="1.4"/>
+  </g>
+
+  <!-- key, resting beside the jar -->
+  <g transform="rotate(-7 300 300)">
+    <circle cx="258" cy="300" r="11" fill="none" stroke="#34332F" stroke-width="3"/>
+    <line x1="269" y1="300" x2="322" y2="300" stroke="#34332F" stroke-width="3" stroke-linecap="round"/>
+    <line x1="312" y1="300" x2="312" y2="309" stroke="#34332F" stroke-width="3" stroke-linecap="round"/>
+    <line x1="320" y1="300" x2="320" y2="312" stroke="#34332F" stroke-width="3" stroke-linecap="round"/>
+  </g>
+
+  <!-- folded note, one softened crease -->
+  <g transform="rotate(4 383 285)">
+    <rect x="340" y="260" width="86" height="50" rx="2" fill="#F3F0E8" stroke="#34332F" stroke-width="1.4"/>
+    <path d="M341 285 C365 288 400 282 425 286" fill="none" stroke="#34332F" stroke-width="1" opacity="0.4"/>
+    <circle cx="410" cy="271" r="3.6" fill="#8F3D32"/>
+  </g>
+
+  <!-- title -->
+  <text x="482" y="205" font-family="Helvetica Neue, Arial, sans-serif" font-size="76" font-weight="500" fill="#34332F">crumb</text>
+  <text x="484" y="243" font-family="Helvetica Neue, Arial, sans-serif" font-size="14" font-weight="400" fill="#857F73">encrypted secret manager, for developers</text>
+</svg>

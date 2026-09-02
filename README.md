@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/hero.svg" alt="crumb: encrypted secrets, held quietly" width="100%">
+</p>
+
 # Crumb - Secret Management Tool
 
 `crumb` is a command line tool designed to securely store, manage, and export API keys and secrets for developers. It uses `age` encryption with SSH public/private key pairs, storing secrets in a local encrypted file that can be synced across machines via a self-hosted `crumbd` server.
