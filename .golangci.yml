@@ -13,6 +13,10 @@ linters:
     gosec:
       excludes:
         - G404
+        # Paths come from $HOME / --storage / --profile set by the user running
+        # the CLI; no privilege boundary is crossed. Re-enable if paths ever
+        # come from untrusted input (e.g. a server request or a cloned repo's config).
+        - G703
     revive:
       rules:
         - name: exported
