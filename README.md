@@ -260,12 +260,14 @@ environments:
     path: ""
     remap: {}
     env: {}
+    keys: {}
 ```
 
 This structure allows you to configure multiple environments, each with:
-- `path`: A path to sync secrets from (e.g., `/myapp/api-key`)
-- `remap`: Key remapping for environment variables
-- `env`: Individual environment variable configurations
+- `path`: Load every secret under this path. Must end with `/` (e.g., `/myapp/dev/`)
+- `remap`: Rename variables that came from `path`
+- `env`: Literal string values (never resolved as secrets)
+- `keys`: Load individual secrets from any path, by full secret path
 
 You can add additional environments for different deployment contexts:
 
@@ -615,26 +617,44 @@ environments:
 ```
 will result in SOME_SECRET_KEY being exported as MY_KEY
 
-#### Manually Setting Environment Varables
+`remap` only applies to variables loaded from `path`, not to `keys` or `env`.
 
-Say you want to also export a variable that isnt in your secrets file you can do so by adding it in the `env` key.
+#### Loading Specific Secrets (`keys`)
+
+Use `keys` to load individual secrets from any path, including paths outside `path`. Each entry maps a variable name to a full secret path:
+
+```yaml
+version: "1.0"
+environments:
+  default:
+    path: "/myapp/dev/"
+    keys:
+      API_KEY: "/shared/API_KEY"
+      STRIPE_KEY: "/payments/STRIPE_KEY"
+```
+
+`keys` works with or without `path`. If you only need a few secrets from a broad path, prefer `keys`. Everything under `path` gets exported into your shell and inherited by every process you start from it.
+
+If a `keys` secret doesn't exist, `crumb load` fails and exports nothing.
+
+#### Setting Literal Values (`env`)
+
+Use `env` to export plain values that aren't secrets:
 
 ```yaml
 environments:
   default:
     ...
     env:
-      MESSAGE: "Hello staging"
+      LOG_LEVEL: "info"
 ```
-If you want to load a single secret from a key you can do it like this:
 
-```yaml
-environments:
-  default:
-    ...
-    env:
-      API_KEY: "/myapp/staging/api_key"
-```
+`env` values are always literal. `CONFIG_DIR: "/etc/app"` exports the string `/etc/app`.
+
+#### Precedence
+
+Later steps win: `path` → `remap` → `keys` → `env`. Defining the same variable in both `keys` and `env` is a config error.
+
 
 ### Export Command
 
@@ -740,7 +760,7 @@ $ cat > .crumb.yaml << EOF
 version: "1.0"
 environments:
   default:
-    path: "/myapp/dev"
+    path: "/myapp/dev/"
     env: {}
     remap: {}
 EOF

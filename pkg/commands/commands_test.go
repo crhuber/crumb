@@ -2,8 +2,12 @@ package commands
 
 import (
 	"os"
+	"reflect"
 	"strings"
 	"testing"
+
+	"crumb/pkg/config"
+	"crumb/pkg/storage"
 )
 
 func TestComputeEnvDiff(t *testing.T) {
@@ -119,6 +123,79 @@ func TestComputeEnvDiff(t *testing.T) {
 						break
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestBuildLoadEnvVars(t *testing.T) {
+	secrets := storage.SecretStore{
+		"/xapi/live/db/url":    {Value: "postgres://live"},
+		"/xapi/live/api-key":   {Value: "path-api-key"},
+		"/xapi/live-old/stale": {Value: "should-not-load"},
+		"/shared/API_KEY":      {Value: "shared-api-key"},
+		"/shared/token":        {Value: "shared-token"},
+	}
+
+	tests := []struct {
+		name    string
+		ec      config.EnvironmentConfig
+		want    map[string]string
+		wantErr bool
+	}{
+		{
+			name: "path only, nested keys, no sibling prefix leak",
+			ec:   config.EnvironmentConfig{Path: "/xapi/live/"},
+			want: map[string]string{"DB_URL": "postgres://live", "API_KEY": "path-api-key"},
+		},
+		{
+			name: "keys only",
+			ec:   config.EnvironmentConfig{Keys: map[string]string{"TOKEN": "/shared/token"}},
+			want: map[string]string{"TOKEN": "shared-token"},
+		},
+		{
+			name: "keys override path",
+			ec: config.EnvironmentConfig{
+				Path: "/xapi/live/",
+				Keys: map[string]string{"API_KEY": "/shared/API_KEY"},
+			},
+			want: map[string]string{"DB_URL": "postgres://live", "API_KEY": "shared-api-key"},
+		},
+		{
+			name: "remap applies to path vars only",
+			ec: config.EnvironmentConfig{
+				Path:  "/xapi/live/",
+				Remap: map[string]string{"DB_URL": "DATABASE_URL", "TOKEN": "RENAMED"},
+				Keys:  map[string]string{"TOKEN": "/shared/token"},
+			},
+			want: map[string]string{"DATABASE_URL": "postgres://live", "API_KEY": "path-api-key", "TOKEN": "shared-token"},
+		},
+		{
+			name: "env values are literal",
+			ec:   config.EnvironmentConfig{Env: map[string]string{"LOG_LEVEL": "info", "NOT_SECRET": "/shared/API_KEY"}},
+			want: map[string]string{"LOG_LEVEL": "info", "NOT_SECRET": "/shared/API_KEY"},
+		},
+		{
+			name:    "missing keys secret fails",
+			ec:      config.EnvironmentConfig{Keys: map[string]string{"NOPE": "/shared/missing"}},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := buildLoadEnvVars(secrets, tt.ec)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got %v", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("got %v, want %v", got, tt.want)
 			}
 		})
 	}
