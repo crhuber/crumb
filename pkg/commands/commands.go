@@ -560,8 +560,6 @@ func LoadCommand(_ context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	envVars := make(map[string]string)
-
 	configFile := cmd.String("file")
 	environmentName := cmd.String("env")
 
@@ -575,6 +573,11 @@ func LoadCommand(_ context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("environment '%s' not found in %s", environmentName, configFile)
 	}
 
+	envVars, err := buildLoadEnvVars(secrets, envConfig)
+	if err != nil {
+		return err
+	}
+
 	if envConfig.Path != "" {
 		comment := fmt.Sprintf("# Exported from %s (environment: %s)", envConfig.Path, environmentName)
 		switch shell {
@@ -583,14 +586,25 @@ func LoadCommand(_ context.Context, cmd *cli.Command) error {
 		case "fish":
 			fmt.Println(comment)
 		}
+	}
 
+	return finalizeExport(shell, envVars)
+}
+
+// buildLoadEnvVars resolves an environment's config into env vars.
+// Order (later wins): path -> remap (path vars only) -> keys -> env (literals).
+func buildLoadEnvVars(secrets storage.SecretStore, envConfig config.EnvironmentConfig) (map[string]string, error) {
+	envVars := make(map[string]string)
+	sanitize := func(name string) string {
+		return strings.ToUpper(strings.ReplaceAll(name, "-", "_"))
+	}
+
+	if envConfig.Path != "" {
 		pathPrefix := strings.TrimSuffix(envConfig.Path, "/")
-		pathSecrets := storage.GetSecretsForPath(secrets, pathPrefix)
-		for secretPath, secretValue := range pathSecrets {
+		for secretPath, secretValue := range storage.GetSecretsForPath(secrets, pathPrefix) {
 			keyName := strings.TrimPrefix(secretPath, pathPrefix)
 			keyName = strings.TrimPrefix(keyName, "/")
-			keyName = strings.ToUpper(strings.ReplaceAll(keyName, "/", "_"))
-			keyName = strings.ReplaceAll(keyName, "-", "_")
+			keyName = sanitize(strings.ReplaceAll(keyName, "/", "_"))
 
 			if keyName != "" {
 				envVars[keyName] = secretValue
@@ -598,29 +612,27 @@ func LoadCommand(_ context.Context, cmd *cli.Command) error {
 		}
 	}
 
-	for envVarName, envVarValue := range envConfig.Env {
-		sanitizedEnvVarName := strings.ToUpper(strings.ReplaceAll(envVarName, "-", "_"))
-
-		if strings.HasPrefix(envVarValue, "/") {
-			if entry, exists := storage.SecretExists(secrets, envVarValue); exists {
-				envVars[sanitizedEnvVarName] = entry.Value
-			}
-		} else {
-			envVars[sanitizedEnvVarName] = envVarValue
-		}
-	}
-
 	for originalKey, newKey := range envConfig.Remap {
-		sanitizedOriginalKey := strings.ToUpper(strings.ReplaceAll(originalKey, "-", "_"))
-		sanitizedNewKey := strings.ToUpper(strings.ReplaceAll(newKey, "-", "_"))
-
+		sanitizedOriginalKey := sanitize(originalKey)
 		if value, exists := envVars[sanitizedOriginalKey]; exists {
-			envVars[sanitizedNewKey] = value
 			delete(envVars, sanitizedOriginalKey)
+			envVars[sanitize(newKey)] = value
 		}
 	}
 
-	return finalizeExport(shell, envVars)
+	for name, secretPath := range envConfig.Keys {
+		entry, exists := storage.SecretExists(secrets, secretPath)
+		if !exists {
+			return nil, fmt.Errorf("keys.%s: secret %s not found", name, secretPath)
+		}
+		envVars[sanitize(name)] = entry.Value
+	}
+
+	for name, value := range envConfig.Env {
+		envVars[sanitize(name)] = value
+	}
+
+	return envVars, nil
 }
 
 // ExportCommand handles exporting secrets directly from a given path

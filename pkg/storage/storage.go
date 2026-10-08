@@ -326,7 +326,8 @@ func MoveSecret(secrets SecretStore, oldKey, newKey string) error {
 // GetSecretsForPath returns values for all secrets matching a path prefix.
 func GetSecretsForPath(secrets SecretStore, pathPrefix string) map[string]string {
 	result := make(map[string]string)
-	pathPrefix = strings.TrimSuffix(pathPrefix, "/")
+	// Match on a segment boundary so "/app/live/" never picks up "/app/live-old/...".
+	pathPrefix = strings.TrimSuffix(pathPrefix, "/") + "/"
 
 	for secretPath, entry := range secrets {
 		if strings.HasPrefix(secretPath, pathPrefix) {

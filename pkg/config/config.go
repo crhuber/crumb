@@ -57,9 +57,10 @@ type CrumbConfig struct {
 }
 
 type EnvironmentConfig struct {
-	Path  string            `yaml:"path"`
-	Remap map[string]string `yaml:"remap"`
-	Env   map[string]string `yaml:"env"`
+	Path  string            `yaml:"path"`  // load all secrets under this prefix (must end with "/")
+	Remap map[string]string `yaml:"remap"` // rename vars derived from Path
+	Env   map[string]string `yaml:"env"`   // literal values, never resolved as secrets
+	Keys  map[string]string `yaml:"keys"`  // VAR_NAME -> secret path
 }
 
 // TomlConfig represents the TOML configuration in ~/.config/crumb/crumb.toml
@@ -160,6 +161,20 @@ func LoadCrumbConfig(configFileName string) (*CrumbConfig, error) {
 		if envConfig.Env == nil {
 			envConfig.Env = make(map[string]string)
 		}
+		if envConfig.Keys == nil {
+			envConfig.Keys = make(map[string]string)
+		}
+		if envConfig.Path != "" && !strings.HasSuffix(envConfig.Path, "/") {
+			return nil, fmt.Errorf("invalid %s: environment %q: path %q must end with \"/\"", configFileName, envName, envConfig.Path)
+		}
+		for name, secretPath := range envConfig.Keys {
+			if err := ValidateKeyPath(secretPath); err != nil {
+				return nil, fmt.Errorf("invalid %s: environment %q: keys.%s: %w", configFileName, envName, name, err)
+			}
+			if _, dup := envConfig.Env[name]; dup {
+				return nil, fmt.Errorf("invalid %s: environment %q: %s is defined in both keys and env", configFileName, envName, name)
+			}
+		}
 		config.Environments[envName] = envConfig
 	}
 
@@ -172,6 +187,7 @@ func CreateDefaultCrumbConfig() *CrumbConfig {
 		Path:  "",
 		Remap: make(map[string]string),
 		Env:   make(map[string]string),
+		Keys:  make(map[string]string),
 	}
 
 	environments := make(map[string]EnvironmentConfig)

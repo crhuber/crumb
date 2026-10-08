@@ -215,11 +215,11 @@ func TestExportCommandIntegration(t *testing.T) {
 	configContent := `version: "1.0"
 environments:
   default:
-    path: "/prod/billing-svc"
+    path: "/prod/billing-svc/"
     remap:
       VARS_MG: "MG_KEY"
       VARS_STRIPE: "STRIPE_KEY"
-    env:
+    keys:
       DATABASE_URL: "/prod/billing-svc/db/url"
       API_SECRET: "/prod/billing-svc/api/secret"`
 
@@ -245,16 +245,16 @@ environments:
 		t.Errorf("Expected 'default' environment to exist")
 	}
 
-	if defaultEnv.Path != "/prod/billing-svc" {
-		t.Errorf("Expected path '/prod/billing-svc', got '%s'", defaultEnv.Path)
+	if defaultEnv.Path != "/prod/billing-svc/" {
+		t.Errorf("Expected path '/prod/billing-svc/', got '%s'", defaultEnv.Path)
 	}
 
-	if len(defaultEnv.Env) != 2 {
-		t.Errorf("Expected 2 env entries, got %d", len(defaultEnv.Env))
+	if len(defaultEnv.Keys) != 2 {
+		t.Errorf("Expected 2 keys entries, got %d", len(defaultEnv.Keys))
 	}
 
-	if defaultEnv.Env["DATABASE_URL"] != "/prod/billing-svc/db/url" {
-		t.Errorf("Expected DATABASE_URL path '/prod/billing-svc/db/url', got '%s'", defaultEnv.Env["DATABASE_URL"])
+	if defaultEnv.Keys["DATABASE_URL"] != "/prod/billing-svc/db/url" {
+		t.Errorf("Expected DATABASE_URL path '/prod/billing-svc/db/url', got '%s'", defaultEnv.Keys["DATABASE_URL"])
 	}
 }
 
